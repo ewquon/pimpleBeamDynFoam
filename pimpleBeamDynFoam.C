@@ -66,11 +66,18 @@ int main(int argc, char *argv[])
     #include "CourantNo.H"
     #include "setInitialDeltaT.H"
 
+    // additional setup for fsi
+    #include "readCouplingProperties.H"
+
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-    Info<< "\nStarting BeamDyn\n" << endl;
-    double dt = runTime.deltaT().value();
-    if(Pstream::master) beamDynStart(&dt);
+    Info<< "\n================================" << endl;
+    Info<< "Starting BeamDyn" << endl;
+    Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n" << endl;
+        double t0 = runTime.startTime().value();
+        double dt = runTime.deltaT().value();
+        if(Pstream::master()) beamDynStart(&t0,&dt);
+    Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
     Info<< "\nStarting time loop\n" << endl;
 
@@ -122,10 +129,17 @@ int main(int argc, char *argv[])
 
         runTime.write();
 
-        //TODO
+        // additional fsi steps
+
+        Info<< "\nCalculating sectional loads for BeamDyn" << endl;
+        #include "updateSectionLoads.H"
+
+        Info<< "\n================================" << endl;
         Info<< "Calling BeamDyn update" << endl;
-        dt = runTime.deltaT().value();
-        //beamDynStep(&dt);
+        Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
+            dt = runTime.deltaT().value();
+            if(Pstream::master()) beamDynStep(&dt);
+        Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
 
         Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
             << "  ClockTime = " << runTime.elapsedClockTime() << " s"
@@ -133,7 +147,7 @@ int main(int argc, char *argv[])
     }
 
     Info<< "Stopping BeamDyn" << endl;
-    if(Pstream::master) beamDynEnd();
+    if(Pstream::master()) beamDynEnd();
 
     Info<< "\nEnd\n" << endl;
 
