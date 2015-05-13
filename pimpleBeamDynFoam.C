@@ -45,7 +45,10 @@ Description
 #include "pimpleControl.H"
 #include "fvIOoptionList.H"
 
+// additional includes
 #include "beamDynInterface.H"
+#include "scalar.H"
+#include "vectorList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

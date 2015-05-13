@@ -14,6 +14,7 @@ IOdictionary couplingProperties
 );
 
 // Read interface patch info
+// TODO: only one interface patch for now
 
 word interfacePatchName(couplingProperties.lookup("interfacePatch"));
 
@@ -30,6 +31,22 @@ if (interfacePatchID < 0)
 
 // Read reference values
 
-dimensionedScalar rhoRef( "rhoRef", dimDensity, couplingProperties.lookupOrDefault<double>("rhoRef",1.0) );
-
+//dimensionedScalar 
+//rhoRef( 
+//        "rhoRef", dimDensity, 
+//        couplingProperties.lookupOrDefault<scalar>("rhoRef",1.0) 
+//);
+scalar rhoRef( couplingProperties.lookupOrDefault<scalar>("rhoRef",1.0) );
 Info<< "  Reference density : " << rhoRef << endl;
+
+label bladeDir( couplingProperties.lookupOrDefault<label>("bladeDir",0) );
+Info<< "  Blade axis : " << bladeDir << endl;
+
+//dimensionedVector
+//origin( 
+//        "origin", dimLength, 
+//        couplingProperties.lookupOrDefault<vector>("origin",vector::zero)
+//);
+vector origin( couplingProperties.lookupOrDefault<vector>("origin",vector::zero) );
+Info<< "  Origin (moment reference) : " << origin << endl;
+
