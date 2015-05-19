@@ -42,6 +42,9 @@ Info<< "  Reference density : " << rhoRef << endl;
 label bladeDir( couplingProperties.lookupOrDefault<label>("bladeDir",0) );
 Info<< "  Blade axis : " << bladeDir << endl;
 
+scalar bladeR( couplingProperties.lookupOrDefault("R",-1) );
+scalar bladeR0( couplingProperties.lookupOrDefault("R0",-1) );
+
 //dimensionedVector
 //origin( 
 //        "origin", dimLength, 
@@ -49,4 +52,7 @@ Info<< "  Blade axis : " << bladeDir << endl;
 //);
 vector origin( couplingProperties.lookupOrDefault<vector>("origin",vector::zero) );
 Info<< "  Origin (moment reference) : " << origin << endl;
+
+scalar loadMultiplier( couplingProperties.lookupOrDefault<scalar>("loadMultiplier",1.0) );
+Info<< "  Load multiplier (FOR DEVELOPMENT) : " << loadMultiplier << endl;
 

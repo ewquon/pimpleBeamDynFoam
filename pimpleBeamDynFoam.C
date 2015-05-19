@@ -33,7 +33,7 @@ Description
     Interface with NREL FAST/BeamDyn added by Eliot Quon (eliot.quon@nrel.gov).
     Usage:
       - Specify the dynamicMotionSolverFvMesh solver in dynamicMeshDict
-      - Apply beamDynInterfacePointPatchVectorField condition to flexible 
+      - Apply beamDynInterface[PointPatchVectorField] condition to flexible 
         wall boundaries
 
 \*---------------------------------------------------------------------------*/
@@ -49,6 +49,7 @@ Description
 #include "beamDynInterface.H"
 #include "scalar.H"
 #include "vectorList.H"
+#include "pointPatchFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -75,12 +76,26 @@ int main(int argc, char *argv[])
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
     Info<< "\n================================" << endl;
-    Info<< "Starting BeamDyn" << endl;
+    Info<< "| Starting BeamDyn" << endl;
     Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n" << endl;
-        double t0 = runTime.startTime().value();
-        double dt = runTime.deltaT().value();
-        if(Pstream::master()) beamDynStart(&t0,&dt);
+    #include "beamDynVars.H"
+
+    if(Pstream::master())
+    {
+        beamDynStart( &t0, &dt );
+        beamDynGetNnodes( &nnodes ); // total number of nodes in beam model
+        beamDynGetNgp( &ngp ); // number of gauss points (per elem) = order_elem = nodes/elem - 1
+    }
+    Pstream::scatter(nnodes);
+    Pstream::scatter(ngp);
     Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+
+    scalarList r(nnodes,0.0);
+    scalarList gp(ngp,0.0);
+    scalarList gllp(ngp,0.0);
+    #include "updateNodePositions.H"
+
+    #include "parametrizeSurface.H"
 
     Info<< "\nStarting time loop\n" << endl;
 
@@ -95,6 +110,8 @@ int main(int argc, char *argv[])
 
         Info<< "Time = " << runTime.timeName() << nl << endl;
 
+        // Displacements are updated through the beamDynInterface boundary condition
+        // Note: there should not be any displacement for the first time step
         mesh.update();
 
         // Calculate absolute flux from the mapped surface velocity
@@ -135,13 +152,16 @@ int main(int argc, char *argv[])
         // additional fsi steps
 
         Info<< "\nCalculating sectional loads for BeamDyn" << endl;
-        #include "updateSectionLoads.H"
+        #include "updateSectionLoads.H" // calls beamDynSetDistributedLoadAtNode
 
         Info<< "\n================================" << endl;
-        Info<< "Calling BeamDyn update" << endl;
+        Info<< "| Calling BeamDyn update" << endl;
         Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
+        if(Pstream::master()) 
+        {
             dt = runTime.deltaT().value();
-            if(Pstream::master()) beamDynStep(&dt);
+            beamDynStep( &dt );
+        }
         Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
 
         Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
