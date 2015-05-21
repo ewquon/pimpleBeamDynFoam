@@ -1,7 +1,5 @@
-    int nSurfNodes = mesh.boundaryMesh()[interfacePatchID].localPoints().size();
     //Pout<< "number of interface nodes = " << nSurfNodes << endl; // Note: will be greater than actual number of surface nodes
                                                                     // because of overlap across procs
-    scalarList s(nSurfNodes, 0.0); // parametrized position, in range [-1,1]
 
     if( bladeR0 < 0.0 ) bladeR0 = r[0];
     if( bladeR  < 0.0 ) bladeR  = r[nnodes-1];
@@ -20,3 +18,28 @@
         Pout<< "parametrized blade coordinates between [ " << min(s) << ", " << max(s) << " ] "
             << "(size=" << nSurfNodes << ")" << endl;
     }
+
+    Info<< "Retrieving element shape function" << endl;
+    if (Pstream::master())
+    {
+        // setup initial position array -- DONT NEED THIS
+//        double Nuu0[3*nnodes]; // assume 1 element
+//        for( int inode=0; inode<nnodes; ++inode )
+//        {
+//            for( int dir=0; dir<3; ++dir )
+//            {
+//                Nuu0[3*inode+dir] = x0[inode][dir];
+//            }
+//        }
+
+        // get shape functions
+        for( int isurf=0; isurf<nSurfNodes; ++isurf )
+        {
+            beamDynGetShapeFunctions( &s[isurf], htemp ); 
+            for( int inode=0; inode<nnodes; ++inode )
+            {
+                hx[isurf*nnodes + inode] = htemp[inode];
+            }
+        }
+    }
+

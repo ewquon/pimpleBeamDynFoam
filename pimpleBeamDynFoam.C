@@ -72,14 +72,16 @@ int main(int argc, char *argv[])
 
     // additional setup for fsi
     #include "readCouplingProperties.H"
+    int nnodes=0, ngp=0;
+    int nSurfNodes = mesh.boundaryMesh()[interfacePatchID].localPoints().size();
+    double t0 = runTime.startTime().value();
+    double dt = runTime.deltaT().value();
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
     Info<< "\n================================" << endl;
     Info<< "| Starting BeamDyn" << endl;
     Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n" << endl;
-    #include "beamDynVars.H"
-
     if(Pstream::master())
     {
         beamDynStart( &t0, &dt );
@@ -90,10 +92,10 @@ int main(int argc, char *argv[])
     Pstream::scatter(ngp);
     Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
-    scalarList r(nnodes,0.0);
-    scalarList gp(ngp,0.0);
-    scalarList gllp(ngp,0.0);
+    #include "beamDynVars.H"
+
     #include "updateNodePositions.H"
+    x0 = pos; // save initial position
 
     #include "parametrizeSurface.H"
 
@@ -162,6 +164,7 @@ int main(int argc, char *argv[])
             dt = runTime.deltaT().value();
             beamDynStep( &dt );
         }
+        #include "updateNodePositions.H"
         Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
 
         Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
@@ -169,8 +172,11 @@ int main(int argc, char *argv[])
             << nl << endl;
     }
 
-    Info<< "Stopping BeamDyn" << endl;
+    Info<< "================================" << endl;
+    Info<< "| Stopping BeamDyn" << endl;
+    Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
     if(Pstream::master()) beamDynEnd();
+    Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
 
     Info<< "\nEnd\n" << endl;
 
