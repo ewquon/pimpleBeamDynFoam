@@ -46,7 +46,9 @@ Description
 #include "fvIOoptionList.H"
 
 // additional includes
-#include "beamDynInterface.H"
+//#include "testspace.H"        // for testing only!
+#include "beamDyn.H"            // BD namespace
+#include "beamDynInterface.H"   // interface with BD Library
 #include "scalar.H"
 #include "vectorList.H"
 #include "pointPatchFields.H"
@@ -73,11 +75,15 @@ int main(int argc, char *argv[])
     // additional setup for fsi
     #include "readCouplingProperties.H"
     int nnodes=0, ngp=0;
-    int nSurfNodes = mesh.boundaryMesh()[interfacePatchID].localPoints().size();
+    //int nSurfNodes = mesh.boundaryMesh()[interfacePatchID].localPoints().size();
+    BD::nSurfNodes = mesh.boundaryMesh()[interfacePatchID].localPoints().size();
     double t0 = runTime.startTime().value();
     double dt = runTime.deltaT().value();
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+//    testspace::deepthought(42);
+//    testspace::ask();
 
     Info<< "\n================================" << endl;
     Info<< "| Starting BeamDyn" << endl;
@@ -86,18 +92,19 @@ int main(int argc, char *argv[])
     {
         beamDynStart( &t0, &dt );
         beamDynGetNnodes( &nnodes ); // total number of nodes in beam model
-        beamDynGetNgp( &ngp ); // number of gauss points (per elem) = order_elem = nodes/elem - 1
+//        beamDynGetNgp( &ngp ); // number of gauss points (per elem) = order_elem = nodes/elem - 1
     }
     Pstream::scatter(nnodes);
-    Pstream::scatter(ngp);
+//    Pstream::scatter(ngp);
     Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
     #include "beamDynVars.H"
 
-    #include "updateNodePositions.H"
-    x0 = pos; // save initial position
-
-    #include "parametrizeSurface.H"
+// moved to beamDynInterfacePointPatchField.C
+//    #include "updateNodePositions.H"
+//    //x0 = pos; // save initial position
+//
+//    #include "parametrizeSurface.H"
 
     Info<< "\nStarting time loop\n" << endl;
 
@@ -164,7 +171,7 @@ int main(int argc, char *argv[])
             dt = runTime.deltaT().value();
             beamDynStep( &dt );
         }
-        #include "updateNodePositions.H"
+//        #include "updateNodePositions.H"
         Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
 
         Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
