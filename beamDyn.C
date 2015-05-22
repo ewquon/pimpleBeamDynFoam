@@ -21,11 +21,27 @@ namespace BD
         Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
         Pstream::scatter(nnodes);
+        r_ptr   = new scalarList(nnodes, 0.0);
+        pos0_ptr= new vectorList(nnodes, vector::zero);
+        rot0_ptr= new vectorList(nnodes, vector::zero);
         pos_ptr = new vectorList(nnodes, vector::zero);
         rot_ptr = new vectorList(nnodes, vector::zero);
-        r_ptr   = new scalarList(nnodes, 0.0);
+        disp_ptr= new vectorList(nnodes, vector::zero);
 
         updateNodePositions();
+
+        for( int inode=0; inode < nnodes; ++inode )
+        {
+            //for( int i=0; i<3; ++i )
+            //{
+            //    *pos0_ptr[inode].component(i) = *pos_ptr[inode].component(i);
+            //    *rot0_ptr[inode].component(i) = *rot_ptr[inode].component(i);
+            //}
+            (*pos0_ptr)[inode] = (*pos_ptr)[inode];
+            (*rot0_ptr)[inode] = (*rot_ptr)[inode];
+        }
+
+        Info<< "BeamDyn initialization complete.\n\n";
     }
 
     void stop()
@@ -35,9 +51,13 @@ namespace BD
         Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
         if(Pstream::master()) beamDynEnd();
         Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
+        delete pos0_ptr;
+        delete rot0_ptr;
         delete pos_ptr;
         delete rot_ptr;
+        delete disp_ptr;
         delete r_ptr;
+        delete [] h_ptr;
     }
 
     void update( double dt )
@@ -62,9 +82,12 @@ namespace BD
 //        Foam::vectorList pos( nnodes, Foam::vector::zero );    // current position (for calling beamDynGetNodePosition)
 //        Foam::vectorList rot( nnodes, Foam::vector::zero );    // current orientation (for calling beamDynGetNodePosition)
 //        Foam::scalarList r( nnodes, 0.0 );                     // spanwise coordinate, used in updateSectionLoads.H
-        vectorList &pos = *pos_ptr;
-        vectorList &rot = *rot_ptr;
         scalarList &r   = *r_ptr;
+        vectorList &pos0= *pos0_ptr;
+        vectorList &pos = *pos_ptr;
+        vectorList &rot0= *rot0_ptr;
+        vectorList &rot = *rot_ptr;
+        vectorList &disp= *disp_ptr;
 
         Info<< "Retrieving node positions" << endl;
         if(Pstream::master())
@@ -80,9 +103,24 @@ namespace BD
                 {
                     pos[inode].component(dir) = posi[dir];
                     rot[inode].component(dir) = roti[dir];
-                }
-                r[inode] = posi[bladeDir];
 
+                    //(*disp_ptr)[inode].component(dir) = 
+                    //    posi[dir] - pos0[inode].component(dir);
+                }
+
+                // get linear/angular displacements
+                vector lin_disp( pos[inode] - pos0[inode] );
+                vector ang_disp( rot[inode] - rot0[inode] );
+
+                //TODO: handle 3D rotations
+                const scalar ang = ang_disp.component(0);   // positive is nose up
+                disp[inode].component(0) = 0.0;             // assume no spanwise deformation (in 2D)
+                disp[inode].component(2) =                  // chordwise (TE->LE) displacement
+                    lin_disp.component(2)*Foam::cos(ang) + lin_disp.component(1)*Foam::sin(ang);
+                disp[inode].component(1) =                  // normal displacement
+                   -lin_disp.component(2)*Foam::sin(ang) + lin_disp.component(1)*Foam::cos(ang);
+
+                r[inode] = posi[bladeDir];
                 Info<< "node " << inode << " at " 
                     << posi[0] << "," << posi[1] << "," << posi[2]
                     << " with orientation " 
@@ -91,11 +129,84 @@ namespace BD
                     << "," << 180.0/pi*roti[2]
                     << "  =>  r= " << r[inode]
                     << endl;
+
+                Info<< "disp " << inode << " : "
+                    << lin_disp[0] << "," << lin_disp[1] << "," << lin_disp[2] << "  "
+                    << ang_disp[0] << "," << ang_disp[1] << "," << ang_disp[2] << "  "
+                    << endl;
             }
-        }
-        Pstream::scatter(pos);
-        Pstream::scatter(rot);
+        }// if Pstream::master
+
         Pstream::scatter(r);
+        Pstream::scatter(pos); // verified that this works
+        Pstream::scatter(rot);
+        Pstream::scatter(disp);
+    }
+
+    void calculateShapeFunctions( const pointField& pf )
+    {
+        nSurfNodes = pf.size();
+        h_ptr = new double[nSurfNodes*nnodes];
+        //double &h = *h_ptr;
+
+        scalarList &r = *r_ptr;
+        if( bladeR0 < 0.0 ) bladeR0 = r[0];
+        if( bladeR  < 0.0 ) bladeR  = r[nnodes-1];
+        //Pout<< "Blade span : " << bladeR0 << " " << bladeR << endl;
+
+        if( nSurfNodes > 0 )
+        {
+            Pout << "calculating shape functions for " << nSurfNodes << " surface nodes" << endl;
+
+            double s;
+            double L_2 = (bladeR-bladeR0)/2.0;
+            double hi[nnodes];
+
+            double num, den;
+            double GLL[nnodes];
+            for( int i=0; i<nnodes; ++i )
+            {
+                GLL[i] = 2.0*(r[i]-r[0])/(r[nnodes-1]-r[0]) - 1.0;
+            }
+
+            forAll( pf, ptI )
+            {
+                s = ( pf[ptI].component(bladeDir) - bladeR0 ) / L_2 - 1.0;
+                //beamDynGetShapeFunctions( &s, hi ); // this only works on the master node...
+                //vvvvvvvvvv Code snippet from BeamDyn diffmtc subroutine vvvvvvvvvv
+                for( int j=0; j<nnodes; ++j )
+                {
+                    hi[j] = 0.0;
+                    num = 1.0;
+                    den = 1.0;
+                    if( abs(s-GLL[j]) <= eps )
+                    {
+                        hi[j] = 1.0;
+                    }
+                    else
+                    {
+                        for( int i=0; i<nnodes; ++i )
+                        {
+                            if( i != j )
+                            {
+                                den *= (GLL[j] - GLL[i]);
+                                num *= (s - GLL[i]);
+                            }
+                        }
+                        hi[j] = num/den;
+                    }
+                }
+                //^^^^^^^^^^^^^^^^^^^ End of code snippet ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+                for( int inode=0; inode < nnodes; ++inode )
+                {
+                    //(*h_ptr)[ptI*nnodes + inode] = hi[inode]; //error: invalid types ‘double[Foam::label {aka int}]’ for array subscript
+                    //h[ptI*nnodes + inode] = hi[inode]; //error: invalid types ‘double[Foam::label {aka int}]’ for array subscript
+                    h_ptr[ptI*nnodes + inode] = hi[inode];
+                }
+
+            }// loop over surface nodes
+        }
     }
 
     void updateSectionLoads( const dynamicFvMesh& mesh, 

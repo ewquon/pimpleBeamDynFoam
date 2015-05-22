@@ -29,6 +29,7 @@ namespace BD
 
     NamespaceName("BeamDyn");
     const scalar pi(Foam::constant::mathematical::pi);
+    const scalar eps(1.0e-8);
 
     // inputs from couplingProperties
 
@@ -49,14 +50,19 @@ namespace BD
     int nnodes=0;
     int nSurfNodes=0; // from boundary mesh interface patch local points
     
+    vectorList *pos0_ptr,*rot0_ptr; // starting position and orientation of beam nodes
     vectorList *pos_ptr, *rot_ptr;  // current position and orientation of beam nodes
+    vectorList *disp_ptr;           // linear displacement at beam nodes
     scalarList *r_ptr;              // spanwise coordinates
+    double *h_ptr;                  // shape functions
 
     // access functions
 
+    vectorList& disp() { return *disp_ptr; };
     vectorList& pos() { return *pos_ptr; };
     vectorList& rot() { return *rot_ptr; };
     scalarList& r() { return *r_ptr; };
+    double* h() { return h_ptr; };
 
     // member functions
 
@@ -65,6 +71,8 @@ namespace BD
     void update( double dt );
 
     void updateNodePositions();
+
+    void calculateShapeFunctions( const pointField& pf );
 
     void updateSectionLoads( const dynamicFvMesh& mesh, 
                              const volScalarField& p, 

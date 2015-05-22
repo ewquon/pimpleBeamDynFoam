@@ -30,6 +30,8 @@ if (BD::interfacePatchID < 0)
         << abort(FatalError);
 }
 
+const polyPatch& interfacePatch = mesh.boundaryMesh()[BD::interfacePatchID];
+
 // Read reference values
 
 //dimensionedScalar 

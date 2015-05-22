@@ -57,7 +57,11 @@ int main(int argc, char *argv[])
 {
     #include "setRootCase.H"
     #include "createTime.H"
-    #include "createDynamicFvMesh.H"
+
+    double t0 = runTime.startTime().value();
+    double dt = runTime.deltaT().value();
+
+    #include "createDynamicFvMesh.H" // motion solver is initialized here
     #include "initContinuityErrs.H"
 
     pimpleControl pimple(mesh);
@@ -70,16 +74,15 @@ int main(int argc, char *argv[])
     #include "CourantNo.H"
     #include "setInitialDeltaT.H"
 
-    // additional setup for fsi
-    #include "readCouplingProperties.H"
-    double t0 = runTime.startTime().value();
-    double dt = runTime.deltaT().value();
+    #include "readCouplingProperties.H" // for BeamDyn coupling
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
     BD::start( t0, dt );
 
-    #include "beamDynVars.H" // TODO: remove this, use BD namespace instead!
+    BD::calculateShapeFunctions( interfacePatch.localPoints() );
+
+//    #include "beamDynVars.H" // TODO: remove this, use BD namespace instead!
 
     Info<< "\nStarting time loop\n" << endl;
 
