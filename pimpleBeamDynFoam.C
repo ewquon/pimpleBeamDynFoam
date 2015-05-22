@@ -48,7 +48,7 @@ Description
 // additional includes
 //#include "testspace.H"        // for testing only!
 #include "beamDyn.H"            // BD namespace
-#include "beamDynInterface.H"   // interface with BD Library
+#include "beamDynInterface.H"   // interface with BD Library, TODO: move this entirely to beamDyn.H
 #include "scalar.H"
 #include "vectorList.H"
 #include "pointPatchFields.H"
@@ -74,31 +74,35 @@ int main(int argc, char *argv[])
 
     // additional setup for fsi
     #include "readCouplingProperties.H"
-    int nnodes=0, ngp=0;
+//    int nnodes=0, ngp=0; // TODO: remove this, use BD namespace instead!
     //int nSurfNodes = mesh.boundaryMesh()[interfacePatchID].localPoints().size();
-    BD::nSurfNodes = mesh.boundaryMesh()[interfacePatchID].localPoints().size();
     double t0 = runTime.startTime().value();
     double dt = runTime.deltaT().value();
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+// for namespace testing 
 //    testspace::deepthought(42);
 //    testspace::ask();
 
-    Info<< "\n================================" << endl;
-    Info<< "| Starting BeamDyn" << endl;
-    Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n" << endl;
-    if(Pstream::master())
-    {
-        beamDynStart( &t0, &dt );
-        beamDynGetNnodes( &nnodes ); // total number of nodes in beam model
-//        beamDynGetNgp( &ngp ); // number of gauss points (per elem) = order_elem = nodes/elem - 1
-    }
-    Pstream::scatter(nnodes);
-//    Pstream::scatter(ngp);
-    Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+//     Info<< "\n================================" << endl;
+//     Info<< "| Starting BeamDyn" << endl;
+//     Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n" << endl;
+//     if(Pstream::master())
+//     {
+//         beamDynStart( &t0, &dt );
+//         beamDynGetNnodes( &BD::nnodes ); // total number of nodes in beam model
+// //        beamDynGetNgp( &ngp ); // number of gauss points (per elem) = order_elem = nodes/elem - 1
+//     }
+//     Pstream::scatter(BD::nnodes);
+// //    Pstream::scatter(ngp);
+// //    nnodes = BD::nnodes;
+// //    Pout << "nnodes= " << nnodes << " " << BD::nnodes << endl;
+//     Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
-    #include "beamDynVars.H"
+    BD::start( t0, dt );
+
+    #include "beamDynVars.H" // TODO: remove this, use BD namespace instead!
 
 // moved to beamDynInterfacePointPatchField.C
 //    #include "updateNodePositions.H"
@@ -160,30 +164,33 @@ int main(int argc, char *argv[])
 
         // additional fsi steps
 
-        Info<< "\nCalculating sectional loads for BeamDyn" << endl;
-        #include "updateSectionLoads.H" // calls beamDynSetDistributedLoadAtNode
+// TEMPORARILY REMOVED
+//        Info<< "\nCalculating sectional loads for BeamDyn" << endl;
+//        #include "updateSectionLoads.H" // calls beamDynSetDistributedLoadAtNode
 
-        Info<< "\n================================" << endl;
-        Info<< "| Calling BeamDyn update" << endl;
-        Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
-        if(Pstream::master()) 
-        {
-            dt = runTime.deltaT().value();
-            beamDynStep( &dt );
-        }
-//        #include "updateNodePositions.H"
-        Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
+//        Info<< "\n================================" << endl;
+//        Info<< "| Calling BeamDyn update" << endl;
+//        Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
+//        if(Pstream::master()) 
+//        {
+//            dt = runTime.deltaT().value();
+//            beamDynStep( &dt );
+//        }
+////        #include "updateNodePositions.H"
+//        Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
+        BD::update( runTime.deltaT().value() );
 
         Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
             << "  ClockTime = " << runTime.elapsedClockTime() << " s"
             << nl << endl;
     }
 
-    Info<< "================================" << endl;
-    Info<< "| Stopping BeamDyn" << endl;
-    Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
-    if(Pstream::master()) beamDynEnd();
-    Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
+//    Info<< "================================" << endl;
+//    Info<< "| Stopping BeamDyn" << endl;
+//    Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
+//    if(Pstream::master()) beamDynEnd();
+//    Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
+    BD::stop();
 
     Info<< "\nEnd\n" << endl;
 

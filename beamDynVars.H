@@ -1,10 +1,12 @@
-    vectorList pos(nnodes,vector::zero);    // current position (for calling beamDynGetNodePosition)
-    vectorList rot(nnodes,vector::zero);    // current orientation (for calling beamDynGetNodePosition)
-    scalarList r(nnodes,0.0);               // spanwise coordinate, used in updateSectionLoads.H
+    vectorList pos(BD::nnodes,vector::zero);    // current position (for calling beamDynGetNodePosition)
+    vectorList rot(BD::nnodes,vector::zero);    // current orientation (for calling beamDynGetNodePosition)
+    scalarList r(BD::nnodes,0.0);               // spanwise coordinate, used in updateSectionLoads.H
+
+    BD::nSurfNodes = mesh.boundaryMesh()[BD::interfacePatchID].localPoints().size();
 
     scalarList s(BD::nSurfNodes, 0.0);          // parametrized position, in range [-1,1]
-    double hx[BD::nSurfNodes*nnodes];
-    double htemp[nnodes];
+    double hx[BD::nSurfNodes*BD::nnodes];       // shape function array
+    double htemp[BD::nnodes];                   // temporary shape function variable
 
 
 // Unused variables:
