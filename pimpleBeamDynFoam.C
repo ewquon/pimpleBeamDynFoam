@@ -164,9 +164,9 @@ int main(int argc, char *argv[])
 
         // additional fsi steps
 
-// TEMPORARILY REMOVED
-//        Info<< "\nCalculating sectional loads for BeamDyn" << endl;
+        Info<< "\nCalculating sectional loads for BeamDyn" << endl;
 //        #include "updateSectionLoads.H" // calls beamDynSetDistributedLoadAtNode
+        BD::updateSectionLoads( mesh, p, turbulence );
 
 //        Info<< "\n================================" << endl;
 //        Info<< "| Calling BeamDyn update" << endl;

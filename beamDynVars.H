@@ -3,6 +3,7 @@
     scalarList r(BD::nnodes,0.0);               // spanwise coordinate, used in updateSectionLoads.H
 
     BD::nSurfNodes = mesh.boundaryMesh()[BD::interfacePatchID].localPoints().size();
+    Pout << "nSurfNodes= " << BD::nSurfNodes << endl;
 
     scalarList s(BD::nSurfNodes, 0.0);          // parametrized position, in range [-1,1]
     double hx[BD::nSurfNodes*BD::nnodes];       // shape function array

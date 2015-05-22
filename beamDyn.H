@@ -2,8 +2,16 @@
 #define beamDyn_H
 
 #include "className.H"
-#include "mathematicalConstants.H"
+
+// need to include these headers so that compilation of 
+// beamDynInterfacePointPatchField doesn't crap out
+#include "fvMesh.H"
+#include "fvMatrices.H"
 #include "vectorList.H"
+#include "dynamicFvMesh.H"
+#include "turbulenceModel.H"
+
+#include "constants.H"
 
 // We're already using namespace Foam from fvCFD.H
 //#ifndef namespaceFoam
@@ -58,7 +66,10 @@ namespace BD
 
     void updateNodePositions();
 
-    void updateSectionLoads();
+    //void updateSectionLoads( dynamicFvMesh& mesh, volScalarField& p, volSymmTensorField& Reff );
+    void updateSectionLoads( const dynamicFvMesh& mesh, 
+                             const volScalarField& p, 
+                             const incompressible::turbulenceModel& turbulence );
 
 }
 
