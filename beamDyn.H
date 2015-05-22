@@ -66,7 +66,6 @@ namespace BD
 
     void updateNodePositions();
 
-    //void updateSectionLoads( dynamicFvMesh& mesh, volScalarField& p, volSymmTensorField& Reff );
     void updateSectionLoads( const dynamicFvMesh& mesh, 
                              const volScalarField& p, 
                              const incompressible::turbulenceModel& turbulence );

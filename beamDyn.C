@@ -49,8 +49,8 @@ namespace BD
         {
             beamDynStep( &dt );
         }
-        updateNodePositions();
         Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
+        updateNodePositions();
     }
 
     //
@@ -98,7 +98,6 @@ namespace BD
         Pstream::scatter(r);
     }
 
-    //void updateSectionLoads( dynamicFvMesh& mesh, volScalarField& p, volSymmTensorField& Reff )
     void updateSectionLoads( const dynamicFvMesh& mesh, 
                              const volScalarField& p, 
                              const incompressible::turbulenceModel& turbulence )
@@ -151,14 +150,10 @@ namespace BD
                     vector dm( rc - origin );
 
                     vector dFp = rhoRef * Sf * (p.boundaryField()[interfacePatchID][faceI] - p0) / dr;
-                    //Fp[inode] += dFp;
-                    //Mp[inode] += dm ^ dFp;
                     Fp += dFp;
                     Mp += dm ^ dFp;
 
                     vector dFv = mag(Sf) * bladePatchShearStress[faceI] / dr;
-                    //Fv[inode] += dFv;
-                    //Mv[inode] += dm ^ dFv;
                     Fv += dFv;
                     Mv += dm ^ dFv;
 
