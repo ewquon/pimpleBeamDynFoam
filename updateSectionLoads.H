@@ -5,19 +5,23 @@
     const polyPatch& bladePatch = mesh.boundaryMesh()[interfacePatchID];
     const vectorField& bladePatchNormals = mesh.Sf().boundaryField()[interfacePatchID];
 
-    //vectorList Fp(nnodes, vector::zero);
-    //vectorList Fv(nnodes, vector::zero);
-    //vectorList Mp(nnodes, vector::zero);
-    //vectorList Mv(nnodes, vector::zero);
-
     // calculate shear stress
+    //   note: devReff returns the effective stress tensor including the laminar stress
+    //   note: face normals point _outside_ the computational domain
     Info<< "Calculating surface shear stresses" << endl;
     const volSymmTensorField Reff(turbulence->devReff());
+//    vectorField bladePatchShearStress = 
+//        (
+//            -mesh.Sf().boundaryField()[interfacePatchID]
+//            /mesh.magSf().boundaryField()[interfacePatchID]
+//        ) & Reff.boundaryField()[interfacePatchID];
+
+// normal points into surface, i.e. the direction the fluid is pushing on the wall
+// this matches the 'forces' function object implementation
+// also, no need to normalize by magSf since we multiply by mag(Sf) later
     vectorField bladePatchShearStress = 
-        (
-            -mesh.Sf().boundaryField()[interfacePatchID]
-            /mesh.magSf().boundaryField()[interfacePatchID]
-        ) & Reff.boundaryField()[interfacePatchID];
+        mesh.Sf().boundaryField()[interfacePatchID]
+        & Reff.boundaryField()[interfacePatchID];
 
     //
     // --loop over nodes in the BeamDyn blade model, assumed single element
@@ -31,22 +35,6 @@
         vector Mp(vector::zero);
         vector Mv(vector::zero);
 
-        // calculate section bounds
-        //if( inode==0 )
-        //{
-        //    r0 = r[0]; 
-        //    r1 = (r0 + r[1])/2.0;
-        //}
-        //else if( inode==nnodes-1 )
-        //{
-        //    r1 = r[nnodes-1];
-        //    r0 = (r[nnodes-2] + r1)/2.0;
-        //}
-        //else
-        //{
-        //    r0 = (r[inode] + r[inode-1])/2.0;
-        //    r1 = (r[inode] + r[inode+1])/2.0;
-        //}
         r0 = r[ig];
         r1 = r[ig+1];
         scalar dr = r1 - r0; // note: this is the width of the integration segment 
@@ -62,17 +50,14 @@
             if( rc[bladeDir] >= r0 && rc[bladeDir] < r1 )
             {
                 vector Sf( bladePatchNormals[faceI] ); // surface normal
-                vector dm( rc - origin );
+                vector dm( rc - origin ); // moment arm
 
                 vector dFp = rhoRef * Sf * (p.boundaryField()[interfacePatchID][faceI] - pRef) / dr;
-                //Fp[inode] += dFp;
-                //Mp[inode] += dm ^ dFp;
                 Fp += dFp;
                 Mp += dm ^ dFp;
 
-                vector dFv = mag(Sf) * bladePatchShearStress[faceI] / dr;
-                //Fv[inode] += dFv;
-                //Mv[inode] += dm ^ dFv;
+                //vector dFv = mag(Sf) * bladePatchShearStress[faceI] / dr;
+                vector dFv = bladePatchShearStress[faceI] / dr;
                 Fv += dFv;
                 Mv += dm ^ dFv;
 
@@ -95,7 +80,7 @@
                 Mtot[i] = loadMultiplier*(Mp[i] + Mv[i]);
             }
             //beamDynSetDistributedLoadAtNode(&inode, Ftot, Mtot);
-            beamDynSetDistributedLoad(&ig, Ftot, Mtot);
+            beamDynSetDistributedLoad(&ig, Ftot, Mtot); // set for each gauss pt
         }
 
         Pstream::gather(nFacesFound, sumOp<int>());
