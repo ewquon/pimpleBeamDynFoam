@@ -62,14 +62,14 @@ namespace BD
 
     void update( double dt )
     {
-        Info<< "\n================================" << endl;
-        Info<< "| Calling BeamDyn update" << endl;
-        Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
+//        Info<< "================================" << endl;
+//        Info<< "| Calling BeamDyn update" << endl;
+//        Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
         if(Pstream::master()) 
         {
             beamDynStep( &dt );
         }
-        Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
+//        Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << nl << endl;
         updateNodePositions();
     }
 
@@ -89,7 +89,7 @@ namespace BD
         vectorList &rot = *rot_ptr;
         vectorList &disp= *disp_ptr;
 
-        Info<< "Retrieving node positions" << endl;
+//        Info<< "Retrieving node positions for the next iteration" << endl;
         if(Pstream::master())
         {
             // --loop over nodes in the BeamDyn blade model (assumed single element)
@@ -121,16 +121,16 @@ namespace BD
                    -lin_disp.component(2)*Foam::sin(ang) + lin_disp.component(1)*Foam::cos(ang);
 
                 r[inode] = posi[bladeDir];
-                Info<< "node " << inode << " at " 
-                    << posi[0] << "," << posi[1] << "," << posi[2]
-                    << " with orientation " 
-                    << 180.0/pi*roti[0] 
-                    << "," << 180.0/pi*roti[1] 
-                    << "," << 180.0/pi*roti[2]
-                    << "  =>  r= " << r[inode]
-                    << endl;
+//                Info<< "  node " << inode << " at " 
+//                    << posi[0] << "," << posi[1] << "," << posi[2]
+//                    << " with orientation " 
+//                    << 180.0/pi*roti[0] 
+//                    << "," << 180.0/pi*roti[1] 
+//                    << "," << 180.0/pi*roti[2]
+//                    << "  =>  r= " << r[inode]
+//                    << endl;
 
-                Info<< "disp " << inode << " : "
+                Info<< "  disp " << inode << " : "
                     << lin_disp[0] << "," << lin_disp[1] << "," << lin_disp[2] << "  "
                     << ang_disp[0] << "," << ang_disp[1] << "," << ang_disp[2] << "  "
                     << endl;
@@ -222,7 +222,7 @@ namespace BD
         const vectorField& bladePatchNormals = mesh.Sf().boundaryField()[interfacePatchID];
 
         // calculate shear stress
-        Info<< "Calculating surface shear stresses" << endl;
+//        Info<< "Calculating surface shear stresses" << endl;
         //const volSymmTensorField Reff(turbulence->devReff());
         const volSymmTensorField Reff(turbulence.devReff());
         vectorField bladePatchShearStress = 
@@ -235,7 +235,7 @@ namespace BD
         // --loop over nodes in the BeamDyn blade model, assumed single element
         //   i.e., nnodes = nodes_elem = order_elem+1 = ngp+1
         //
-        Info<< "Integrating sectional loads" << endl;
+//        Info<< "Integrating sectional loads" << endl;
         for( int ig=0; ig<nnodes-1; ++ig ) 
         {
             vector Fp(vector::zero);
@@ -292,8 +292,8 @@ namespace BD
             }
 
             Pstream::gather(nFacesFound, sumOp<int>());
-            Info<< "segment " << ig
-                << " with " << nFacesFound << " faces between " << r0 << " " << r1 << ":"
+            Info<< "  seg " << ig
+                << " with " << nFacesFound << " faces btwn " << r0 << " " << r1 << ":"
                 << " (" << Ftot[0] << " " << Ftot[1] << " " << Ftot[2] << ") " 
                 << " (" << Mtot[0] << " " << Mtot[1] << " " << Mtot[2] << ") " 
                 << endl;

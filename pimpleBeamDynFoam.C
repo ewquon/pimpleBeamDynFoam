@@ -143,7 +143,8 @@ int main(int argc, char *argv[])
 
         BD::update( runTime.deltaT().value() );
 
-        Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
+        Info<< nl
+            << "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
             << "  ClockTime = " << runTime.elapsedClockTime() << " s"
             << nl << endl;
     }
