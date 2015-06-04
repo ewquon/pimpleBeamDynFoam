@@ -43,55 +43,6 @@ namespace BD
                     Info<< "Problem opening restart file " << rstFile << endl;
                 }   
                    
-                // attempt to read data for restart
-//                double t, ax, ay, az, bx, by, bz;
-//                double ux0, uy0, uz0, tx0, ty0, tz0;
-//                double fx0, fy0, fz0, mx0, my0, mz0;
-//                int loadSteps=0, dispSteps=0;
-//                bool foundLoadStep=false, foundDispStep=false;
-//
-//                Info<< "Checking for restart data" << endl;
-//                while( loadFile >> t >> ax >> ay >> az >> bx >> by >> bz )
-//                {
-//                    loadSteps += 1;
-//                    if (t==t0)
-//                    {
-//                        fx0 = ax;
-//                        fy0 = ay;
-//                        fz0 = az;
-//                        mx0 = bx;
-//                        my0 = by;
-//                        mz0 = bz;
-//                        foundLoadStep = true;
-//                    }
-//                }
-//                while( dispFile >> t >> ax >> ay >> az >> bx >> by >> bz )
-//                {
-//                    dispSteps += 1;
-//                    if (t==t0)
-//                    {
-//                        ux0 = ax;
-//                        uy0 = ay;
-//                        uz0 = az;
-//                        tx0 = bx;
-//                        ty0 = by;
-//                        tz0 = bz;
-//                        foundDispStep = true;
-//                    }
-//                }
-//
-//                Info<< "Number of load and displacement steps read : "
-//                    << loadSteps << " " << dispSteps << endl;
-//
-//                canRestart = foundLoadStep && foundDispStep && loadSteps==dispSteps;
-//                if (canRestart)
-//                {
-//                    Info<< "Restarting with :" << endl;
-//                    Info << "  linear displacement  " << ux0 << " " << uy0 << " " << uz0 << endl;
-//                    Info << "  angular displacement " << tx0 << " " << ty0 << " " << tz0 << endl;
-//                    Info << "  force distribution  " << fx0 << " " << fy0 << " " << fz0 << endl;
-//                    Info << "  moment distribution " << mx0 << " " << my0 << " " << mz0 << endl;
-//                }
                 beamDynReadState( rstFile.c_str() );
 
                 loadFile.open("load.out", std::ios::in | std::ios::out | std::ios::app);
