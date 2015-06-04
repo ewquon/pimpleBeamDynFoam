@@ -3,22 +3,26 @@
 
 namespace BD
 {
-
     //
     // Routines that directly interface with BeamDyn
     //
 
     void start( double t0, double dt )
     {
-        Info<< "\n================================" << endl;
-        Info<< "| Starting BeamDyn" << endl;
-        Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n" << endl;
-        if(Pstream::master())
+        currentTime = t0;
+
+        if (Pstream::master())
         {
+            Info<< "\n================================" << endl;
+            Info<< "| Starting BeamDyn" << endl;
+            Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n" << endl;
             beamDynStart( &t0, &dt );
+            //if (canRestart) beamDynRestart( &t0, &dt );
+            //else beamDynStart( &t0, &dt );
             beamDynGetNnodes( &nnodes ); // total number of nodes in beam model
+            Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+
         }
-        Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
         Pstream::scatter(nnodes);
         r_ptr   = new scalarList(nnodes, 0.0);
@@ -27,6 +31,85 @@ namespace BD
         pos_ptr = new vectorList(nnodes, vector::zero);
         rot_ptr = new vectorList(nnodes, vector::zero);
         disp_ptr= new vectorList(nnodes, vector::zero);
+
+        if(Pstream::master())
+        {
+            if (t0 > 0)
+            {
+                std::string rstFile("BeamDynState_" + Foam::Time::timeName(t0) + ".dat");
+                if (FILE *file = fopen(rstFile.c_str(), "r")) {
+                    fclose(file);
+                } else {
+                    Info<< "Problem opening restart file " << rstFile << endl;
+                }   
+                   
+                // attempt to read data for restart
+//                double t, ax, ay, az, bx, by, bz;
+//                double ux0, uy0, uz0, tx0, ty0, tz0;
+//                double fx0, fy0, fz0, mx0, my0, mz0;
+//                int loadSteps=0, dispSteps=0;
+//                bool foundLoadStep=false, foundDispStep=false;
+//
+//                Info<< "Checking for restart data" << endl;
+//                while( loadFile >> t >> ax >> ay >> az >> bx >> by >> bz )
+//                {
+//                    loadSteps += 1;
+//                    if (t==t0)
+//                    {
+//                        fx0 = ax;
+//                        fy0 = ay;
+//                        fz0 = az;
+//                        mx0 = bx;
+//                        my0 = by;
+//                        mz0 = bz;
+//                        foundLoadStep = true;
+//                    }
+//                }
+//                while( dispFile >> t >> ax >> ay >> az >> bx >> by >> bz )
+//                {
+//                    dispSteps += 1;
+//                    if (t==t0)
+//                    {
+//                        ux0 = ax;
+//                        uy0 = ay;
+//                        uz0 = az;
+//                        tx0 = bx;
+//                        ty0 = by;
+//                        tz0 = bz;
+//                        foundDispStep = true;
+//                    }
+//                }
+//
+//                Info<< "Number of load and displacement steps read : "
+//                    << loadSteps << " " << dispSteps << endl;
+//
+//                canRestart = foundLoadStep && foundDispStep && loadSteps==dispSteps;
+//                if (canRestart)
+//                {
+//                    Info<< "Restarting with :" << endl;
+//                    Info << "  linear displacement  " << ux0 << " " << uy0 << " " << uz0 << endl;
+//                    Info << "  angular displacement " << tx0 << " " << ty0 << " " << tz0 << endl;
+//                    Info << "  force distribution  " << fx0 << " " << fy0 << " " << fz0 << endl;
+//                    Info << "  moment distribution " << mx0 << " " << my0 << " " << mz0 << endl;
+//                }
+                beamDynReadState( rstFile.c_str() );
+
+                loadFile.open("load.out", std::ios::in | std::ios::out | std::ios::app);
+                dispFile.open("disp.out", std::ios::in | std::ios::out | std::ios::app);
+            }
+            else
+            {
+                loadFile.open("load.out", std::ios::out);
+                dispFile.open("disp.out", std::ios::out);
+            }
+            if (!loadFile.is_open()) Info<< "Problem opening load.out???" << endl;
+            if (!dispFile.is_open()) Info<< "Problem opening disp.out???" << endl;
+
+            Info<< "Setting precision to " << std::numeric_limits<double>::digits10 << endl;
+            loadFile.precision(std::numeric_limits<double>::digits10);
+            dispFile.precision(std::numeric_limits<double>::digits10);
+
+        } //if Pstream master
 
         updateNodePositions();
 
@@ -44,6 +127,8 @@ namespace BD
         Info<< "BeamDyn initialization complete.\n\n";
     }
 
+    //*********************************************************************************************
+
     void stop()
     {
         Info<< "================================" << endl;
@@ -51,6 +136,7 @@ namespace BD
         Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
         if(Pstream::master()) beamDynEnd();
         Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
+
         delete pos0_ptr;
         delete rot0_ptr;
         delete pos_ptr;
@@ -58,13 +144,22 @@ namespace BD
         delete disp_ptr;
         delete r_ptr;
         delete [] h_ptr;
+
+        if (Pstream::master)
+        {
+            loadFile.close();
+            dispFile.close();
+        }
     }
 
-    void update( double dt )
+    //*********************************************************************************************
+
+    void update( double t, double dt )
     {
 //        Info<< "================================" << endl;
 //        Info<< "| Calling BeamDyn update" << endl;
 //        Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
+        currentTime = t;
         if(Pstream::master()) 
         {
             beamDynStep( &dt );
@@ -73,6 +168,18 @@ namespace BD
         updateNodePositions();
     }
 
+    //*********************************************************************************************
+
+    void write( bool writeNow, std::string timeName  )
+    {
+        if (!writeNow || !Pstream::master()) return;
+
+        std::string fname("BeamDynState_" + timeName + ".dat");
+        beamDynWriteState( fname.c_str() );
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
     //
     // Interface calculations
     //
@@ -92,6 +199,8 @@ namespace BD
 //        Info<< "Retrieving node positions for the next iteration" << endl;
         if(Pstream::master())
         {
+            dispFile << currentTime;
+
             // --loop over nodes in the BeamDyn blade model (assumed single element)
             double posi[3], roti[3];
             for( int inode=0; inode<nnodes; ++inode ) 
@@ -130,11 +239,22 @@ namespace BD
 //                    << "  =>  r= " << r[inode]
 //                    << endl;
 
-                Info<< "  disp " << inode << " : "
-                    << lin_disp[0] << "," << lin_disp[1] << "," << lin_disp[2] << "  "
-                    << ang_disp[0] << "," << ang_disp[1] << "," << ang_disp[2] << "  "
-                    << endl;
-            }
+//                Info<< "  disp " << inode << " : "
+//                    << lin_disp[0] << "," << lin_disp[1] << "," << lin_disp[2] << "  "
+//                    << ang_disp[0] << "," << ang_disp[1] << "," << ang_disp[2] << "  "
+//                    << endl;
+
+                dispFile << " " << lin_disp[0] 
+                         << " " << lin_disp[1] 
+                         << " " << lin_disp[2];
+                dispFile << " " << 180/pi*roti[0] 
+                         << " " << 180/pi*roti[1] 
+                         << " " << 180/pi*roti[2];
+
+            }// loop over beam nodes
+
+            dispFile << std::endl;
+
         }// if Pstream::master
 
         Pstream::scatter(r);
@@ -142,6 +262,8 @@ namespace BD
         Pstream::scatter(rot);
         Pstream::scatter(disp);
     }
+
+    //*********************************************************************************************
 
     void calculateShapeFunctions( const pointField& pf )
     {
@@ -209,6 +331,8 @@ namespace BD
         }
     }
 
+    //*********************************************************************************************
+
     void updateSectionLoads( const dynamicFvMesh& mesh, 
                              const volScalarField& p, 
                              const incompressible::turbulenceModel& turbulence )
@@ -235,7 +359,9 @@ namespace BD
         // --loop over nodes in the BeamDyn blade model, assumed single element
         //   i.e., nnodes = nodes_elem = order_elem+1 = ngp+1
         //
+        loadFile << currentTime;
 //        Info<< "Integrating sectional loads" << endl;
+        if(initialInfo) Info<< "Initial info:" << endl;
         for( int ig=0; ig<nnodes-1; ++ig ) 
         {
             vector Fp(vector::zero);
@@ -289,16 +415,35 @@ namespace BD
                 }
                 //beamDynSetDistributedLoadAtNode(&inode, Ftot, Mtot);
                 beamDynSetDistributedLoad(&ig, Ftot, Mtot);
+
+                loadFile << " " << Ftot[0] 
+                         << " " << Ftot[1] 
+                         << " " << Ftot[2];
+                loadFile << " " << Mtot[0] 
+                         << " " << Mtot[1] 
+                         << " " << Mtot[2];
+                
             }
 
-            Pstream::gather(nFacesFound, sumOp<int>());
-            Info<< "  seg " << ig
-                << " with " << nFacesFound << " faces btwn " << r0 << " " << r1 << ":"
-                << " (" << Ftot[0] << " " << Ftot[1] << " " << Ftot[2] << ") " 
-                << " (" << Mtot[0] << " " << Mtot[1] << " " << Mtot[2] << ") " 
-                << endl;
+            if (initialInfo)
+            {
+                Pstream::gather(nFacesFound, sumOp<int>());
+                //Info<< "  seg " << ig
+                //    << " with " << nFacesFound << " faces btwn " << r0 << " " << r1 << ":"
+                //    << " (" << Ftot[0] << " " << Ftot[1] << " " << Ftot[2] << ") " 
+                //    << " (" << Mtot[0] << " " << Mtot[1] << " " << Mtot[2] << ") " 
+                //    << endl;
+                Info<< "segment " << ig
+                    << " with " << nFacesFound << " faces"
+                    << " between " << r0 << " " << r1 << endl;
+            }
 
         } // end loop over beamdyn nodes
+
+        loadFile << std::endl;
+
+        initialInfo = false;
+
     }
 
-}
+} // end of BD namespace

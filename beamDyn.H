@@ -4,7 +4,7 @@
 #include "className.H"
 
 // need to include these headers so that compilation of 
-// beamDynInterfacePointPatchField doesn't crap out
+// beamDynInterfacePointPatchField doesn't crap out!
 #include "fvMesh.H"
 #include "fvMatrices.H"
 #include "vectorList.H"
@@ -12,6 +12,9 @@
 #include "turbulenceModel.H"
 
 #include "constants.H"
+
+#include <fstream>
+#include <limits>
 
 // We're already using namespace Foam from fvCFD.H
 //#ifndef namespaceFoam
@@ -30,6 +33,10 @@ namespace BD
     NamespaceName("BeamDyn");
     const scalar pi(Foam::constant::mathematical::pi);
     const scalar eps(1.0e-8);
+    bool initialInfo = true;
+
+    std::fstream loadFile;
+    std::fstream dispFile;
 
     // inputs from couplingProperties
 
@@ -50,6 +57,8 @@ namespace BD
     int nnodes=0;
     int nSurfNodes=0; // from boundary mesh interface patch local points
     
+    double currentTime = -1;
+
     vectorList *pos0_ptr,*rot0_ptr; // starting position and orientation of beam nodes
     vectorList *pos_ptr, *rot_ptr;  // current position and orientation of beam nodes
     vectorList *disp_ptr;           // linear displacement at beam nodes
@@ -68,7 +77,7 @@ namespace BD
 
     void start( double t0, double dt );
     void stop();
-    void update( double dt );
+    void update( double t, double dt );
 
     void updateNodePositions();
 

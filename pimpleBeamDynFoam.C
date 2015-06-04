@@ -80,9 +80,9 @@ int main(int argc, char *argv[])
 
     BD::start( t0, dt );
 
+    // calculate shape functions once and for all at all surface nodes where 
+    // we will need to interpolate the beam displacement solution
     BD::calculateShapeFunctions( interfacePatch.localPoints() );
-
-//    #include "beamDynVars.H" // TODO: remove this, use BD namespace instead!
 
     Info<< "\nStarting time loop\n" << endl;
 
@@ -136,12 +136,15 @@ int main(int argc, char *argv[])
 
         runTime.write();
 
+        //
         // additional fsi steps
+        //
 
-        Info<< "\nCalculating sectional loads for BeamDyn" << endl;
         BD::updateSectionLoads( mesh, p, turbulence );
+        BD::update( runTime.timeOutputValue(), runTime.deltaT().value() );
+        
+        BD::write( runTime.outputTime(), runTime.timeName() );
 
-        BD::update( runTime.deltaT().value() );
 
         Info<< nl
             << "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
