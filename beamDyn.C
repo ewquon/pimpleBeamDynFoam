@@ -310,9 +310,12 @@ namespace BD
 //              /mesh.magSf().boundaryField()[interfacePatchID]
 //          ) & Reff.boundaryField()[interfacePatchID];
 
-        // normal points into surface, i.e. the direction the fluid is pushing on the wall
-        // this matches the 'forces' function object implementation
-        // also, no need to normalize by magSf since we multiply by mag(Sf) later
+        // Face normals point into solid surface, i.e., outward from fluid volume, 
+        // i.e. the direction the fluid is pushing on the wall.
+        // This matches the 'forces' function object implementation 
+        // in Foam::forces::calcForcesMoment() at
+        //   ~/OpenFOAM/OpenFOAM-2.3.1/src/postProcessing/functionObjects/forces/forces/forces.C
+        // - also, no need to normalize by magSf since we multiply by mag(Sf) later
         vectorField bladePatchShearStress = 
             mesh.Sf().boundaryField()[interfacePatchID]
             & Reff.boundaryField()[interfacePatchID];
@@ -375,6 +378,8 @@ namespace BD
                     Ftot[i] = loadMultiplier*(Fp[i] + Fv[i]);
                     Mtot[i] = loadMultiplier*(Mp[i] + Mv[i]);
                 }
+
+                // Update F_foam and M_foam in BeamDyn library
                 //beamDynSetDistributedLoadAtNode(&inode, Ftot, Mtot);
                 beamDynSetDistributedLoad(&ig, Ftot, Mtot);
 
@@ -384,7 +389,6 @@ namespace BD
                 loadFile << " " << Mtot[0] 
                          << " " << Mtot[1] 
                          << " " << Mtot[2];
-                
             }
 
             if (first)
