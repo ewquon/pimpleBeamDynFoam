@@ -186,9 +186,6 @@ namespace BD
 
     void updateNodePositions()
     {
-//        Foam::vectorList pos( nnodes, Foam::vector::zero );    // current position (for calling beamDynGetNodePosition)
-//        Foam::vectorList rot( nnodes, Foam::vector::zero );    // current orientation (for calling beamDynGetNodePosition)
-//        Foam::scalarList r( nnodes, 0.0 );                     // spanwise coordinate, used in updateSectionLoads.H
         scalarList &r   = *r_ptr;
         vectorList &pos0= *pos0_ptr;
         vectorList &pos = *pos_ptr;
@@ -212,9 +209,6 @@ namespace BD
                 {
                     pos[inode].component(dir) = posi[dir];
                     rot[inode].component(dir) = roti[dir];
-
-                    //(*disp_ptr)[inode].component(dir) = 
-                    //    posi[dir] - pos0[inode].component(dir);
                 }
 
                 // get linear/angular displacements
@@ -230,19 +224,6 @@ namespace BD
                    -lin_disp.component(2)*Foam::sin(ang) + lin_disp.component(1)*Foam::cos(ang);
 
                 r[inode] = posi[bladeDir];
-//                Info<< "  node " << inode << " at " 
-//                    << posi[0] << "," << posi[1] << "," << posi[2]
-//                    << " with orientation " 
-//                    << 180.0/pi*roti[0] 
-//                    << "," << 180.0/pi*roti[1] 
-//                    << "," << 180.0/pi*roti[2]
-//                    << "  =>  r= " << r[inode]
-//                    << endl;
-
-//                Info<< "  disp " << inode << " : "
-//                    << lin_disp[0] << "," << lin_disp[1] << "," << lin_disp[2] << "  "
-//                    << ang_disp[0] << "," << ang_disp[1] << "," << ang_disp[2] << "  "
-//                    << endl;
 
                 dispFile << " " << lin_disp[0] 
                          << " " << lin_disp[1] 
@@ -322,8 +303,6 @@ namespace BD
 
                 for( int inode=0; inode < nnodes; ++inode )
                 {
-                    //(*h_ptr)[ptI*nnodes + inode] = hi[inode]; //error: invalid types ‘double[Foam::label {aka int}]’ for array subscript
-                    //h[ptI*nnodes + inode] = hi[inode]; //error: invalid types ‘double[Foam::label {aka int}]’ for array subscript
                     h_ptr[ptI*nnodes + inode] = hi[inode];
                 }
 
@@ -347,7 +326,6 @@ namespace BD
 
         // calculate shear stress
 //        Info<< "Calculating surface shear stresses" << endl;
-        //const volSymmTensorField Reff(turbulence->devReff());
         const volSymmTensorField Reff(turbulence.devReff());
         vectorField bladePatchShearStress = 
             (
@@ -398,7 +376,6 @@ namespace BD
                 }
 
             }// end of face loop
-            //Pout << "nFacesFound= " << nFacesFound << " between " << r0 << " " << r1 << endl;
 
             Pstream::gather(Fp, sumOp<vector>()); // These are the DISTRIBUTED loads!
             Pstream::gather(Fv, sumOp<vector>());
