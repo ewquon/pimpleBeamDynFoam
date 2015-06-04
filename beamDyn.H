@@ -33,7 +33,7 @@ namespace BD
     NamespaceName("BeamDyn");
     const scalar pi(Foam::constant::mathematical::pi);
     const scalar eps(1.0e-8);
-    bool initialInfo = true;
+    bool first = true;
 
     std::fstream loadFile;
     std::fstream dispFile;
@@ -58,6 +58,7 @@ namespace BD
     int nSurfNodes=0; // from boundary mesh interface patch local points
     
     double currentTime = -1;
+    double currentDeltaT = -1;
 
     vectorList *pos0_ptr,*rot0_ptr; // starting position and orientation of beam nodes
     vectorList *pos_ptr, *rot_ptr;  // current position and orientation of beam nodes

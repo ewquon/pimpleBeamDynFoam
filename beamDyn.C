@@ -3,13 +3,16 @@
 
 namespace BD
 {
+    ///////////////////////////////////////////////////////////////////////////////////////////////
     //
     // Routines that directly interface with BeamDyn
     //
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
     void start( double t0, double dt )
     {
         currentTime = t0;
+        currentDeltaT = dt;
 
         if (Pstream::master())
         {
@@ -17,21 +20,22 @@ namespace BD
             Info<< "| Starting BeamDyn" << endl;
             Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n" << endl;
             beamDynStart( &t0, &dt );
-            //if (canRestart) beamDynRestart( &t0, &dt );
-            //else beamDynStart( &t0, &dt );
             beamDynGetNnodes( &nnodes ); // total number of nodes in beam model
             Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
         }
 
+        // initialize arrays for storing configuration
         Pstream::scatter(nnodes);
-        r_ptr   = new scalarList(nnodes, 0.0);
-        pos0_ptr= new vectorList(nnodes, vector::zero);
-        rot0_ptr= new vectorList(nnodes, vector::zero);
-        pos_ptr = new vectorList(nnodes, vector::zero);
-        rot_ptr = new vectorList(nnodes, vector::zero);
-        disp_ptr= new vectorList(nnodes, vector::zero);
+        r_ptr    = new scalarList(nnodes, 0.0);
+        pos0_ptr = new vectorList(nnodes, vector::zero);
+        rot0_ptr = new vectorList(nnodes, vector::zero);
+        pos_ptr  = new vectorList(nnodes, vector::zero);
+        rot_ptr  = new vectorList(nnodes, vector::zero);
+        disp_ptr = new vectorList(nnodes, vector::zero);
 
+        // perform restart read of saved state data if necessary
+        // open disp.out and load.out for writing later
         if(Pstream::master())
         {
             if (t0 > 0)
@@ -60,20 +64,28 @@ namespace BD
             loadFile.precision(std::numeric_limits<double>::digits10);
             dispFile.precision(std::numeric_limits<double>::digits10);
 
+            // get initial configuration
+            double posi[3], roti[3];
+            for( int inode=0; inode < nnodes; ++inode )
+            {
+                beamDynGetInitNode0Position( &inode, posi, roti );
+                for(int i=0; i < 3; ++i) {
+                    (*pos0_ptr)[inode][i] = posi[i];
+                    (*rot0_ptr)[inode][i] = roti[i];
+                }
+            }
+
         } //if Pstream master
 
-        updateNodePositions();
+        updateNodePositions(); // this should write out either the initial configuration (0's)
+                               // or the restart configuration
 
-        for( int inode=0; inode < nnodes; ++inode )
-        {
-            //for( int i=0; i<3; ++i )
-            //{
-            //    *pos0_ptr[inode].component(i) = *pos_ptr[inode].component(i);
-            //    *rot0_ptr[inode].component(i) = *rot_ptr[inode].component(i);
-            //}
-            (*pos0_ptr)[inode] = (*pos_ptr)[inode];
-            (*rot0_ptr)[inode] = (*rot_ptr)[inode];
-        }
+//        // save initial configuration, used by updateNodePositions() in subsequent iterations
+//        for( int inode=0; inode < nnodes; ++inode )
+//        {
+//            (*pos0_ptr)[inode] = (*pos_ptr)[inode];
+//            (*rot0_ptr)[inode] = (*rot_ptr)[inode];
+//        }
 
         Info<< "BeamDyn initialization complete.\n\n";
     }
@@ -111,6 +123,7 @@ namespace BD
 //        Info<< "| Calling BeamDyn update" << endl;
 //        Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
         currentTime = t;
+        currentDeltaT = dt;
         if(Pstream::master()) 
         {
             beamDynStep( &dt );
@@ -134,26 +147,34 @@ namespace BD
     //
     // Interface calculations
     //
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    // Retrieve disp array from the BeamDyn library
+    // TODO: clean this up?
+    // - updates pos/rot, used to calculate disp
+    // - updates disp, accessed through BD::disp() in beamDynInterfacePointPatch::updateCoeffs()
+    // - updates r, used by updateSectionLoads()
+    // - writes displacement at the starting time step to disp.out
     void updateNodePositions()
     {
-        scalarList &r   = *r_ptr;
-        vectorList &pos0= *pos0_ptr;
-        vectorList &pos = *pos_ptr;
-        vectorList &rot0= *rot0_ptr;
-        vectorList &rot = *rot_ptr;
-        vectorList &disp= *disp_ptr;
+        scalarList &r    = *r_ptr;
+        vectorList &pos0 = *pos0_ptr;
+        vectorList &pos  = *pos_ptr;
+        vectorList &rot0 = *rot0_ptr;
+        vectorList &rot  = *rot_ptr;
+        vectorList &disp = *disp_ptr;
 
 //        Info<< "Retrieving node positions for the next iteration" << endl;
         if(Pstream::master())
         {
-            dispFile << currentTime;
+            if (!first) dispFile << currentTime;
 
             // --loop over nodes in the BeamDyn blade model (assumed single element)
+            //   TODO: handle multiple elements
             double posi[3], roti[3];
             for( int inode=0; inode<nnodes; ++inode ) 
             {
-                // get node position
+                // get node position and angle [rad]
                 beamDynGetNode0Position( &inode, posi, roti );
 
                 for( int dir=0; dir<3; ++dir )
@@ -176,16 +197,19 @@ namespace BD
 
                 r[inode] = posi[bladeDir];
 
-                dispFile << " " << lin_disp[0] 
-                         << " " << lin_disp[1] 
-                         << " " << lin_disp[2];
-                dispFile << " " << 180/pi*roti[0] 
-                         << " " << 180/pi*roti[1] 
-                         << " " << 180/pi*roti[2];
+                if (!first) // don't need to write out initial config, either 0's or repeated on restart
+                {
+                    dispFile << " " << lin_disp[0] 
+                             << " " << lin_disp[1] 
+                             << " " << lin_disp[2];
+                    dispFile << " " << 180/pi*roti[0] 
+                             << " " << 180/pi*roti[1] 
+                             << " " << 180/pi*roti[2];
+                }
 
             }// loop over beam nodes
 
-            dispFile << std::endl;
+            if (!first) dispFile << std::endl;
 
         }// if Pstream::master
 
@@ -288,9 +312,10 @@ namespace BD
         // --loop over nodes in the BeamDyn blade model, assumed single element
         //   i.e., nnodes = nodes_elem = order_elem+1 = ngp+1
         //
-        loadFile << currentTime;
+        //loadFile << currentTime; // at this point, still equal to t at beginning of time step
+        loadFile << currentTime + currentDeltaT;
 //        Info<< "Integrating sectional loads" << endl;
-        if(initialInfo) Info<< "Initial info:" << endl;
+        if(first) Info<< "Initial info:" << endl;
         for( int ig=0; ig<nnodes-1; ++ig ) 
         {
             vector Fp(vector::zero);
@@ -353,7 +378,7 @@ namespace BD
                 
             }
 
-            if (initialInfo)
+            if (first)
             {
                 Pstream::gather(nFacesFound, sumOp<int>());
                 //Info<< "  seg " << ig
@@ -370,7 +395,7 @@ namespace BD
 
         loadFile << std::endl;
 
-        initialInfo = false;
+        first = false;
 
     }
 
