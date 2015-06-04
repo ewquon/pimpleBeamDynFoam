@@ -300,13 +300,22 @@ namespace BD
         const vectorField& bladePatchNormals = mesh.Sf().boundaryField()[interfacePatchID];
 
         // calculate shear stress
+        //   note: devReff returns the effective stress tensor including the laminar stress
+        //   note: face normals point _outside_ the computational domain
 //        Info<< "Calculating surface shear stresses" << endl;
         const volSymmTensorField Reff(turbulence.devReff());
+//      vectorField bladePatchShearStress = 
+//          (
+//              -mesh.Sf().boundaryField()[interfacePatchID]
+//              /mesh.magSf().boundaryField()[interfacePatchID]
+//          ) & Reff.boundaryField()[interfacePatchID];
+
+        // normal points into surface, i.e. the direction the fluid is pushing on the wall
+        // this matches the 'forces' function object implementation
+        // also, no need to normalize by magSf since we multiply by mag(Sf) later
         vectorField bladePatchShearStress = 
-            (
-                -mesh.Sf().boundaryField()[interfacePatchID]
-                /mesh.magSf().boundaryField()[interfacePatchID]
-            ) & Reff.boundaryField()[interfacePatchID];
+            mesh.Sf().boundaryField()[interfacePatchID]
+            & Reff.boundaryField()[interfacePatchID];
 
         //
         // --loop over nodes in the BeamDyn blade model, assumed single element
