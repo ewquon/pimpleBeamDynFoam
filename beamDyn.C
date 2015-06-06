@@ -60,9 +60,11 @@ namespace BD
             if (!loadFile.is_open()) Info<< "Problem opening load.out???" << endl;
             if (!dispFile.is_open()) Info<< "Problem opening disp.out???" << endl;
 
-            Info<< "Setting precision to " << std::numeric_limits<double>::digits10 << endl;
-            loadFile.precision(std::numeric_limits<double>::digits10);
-            dispFile.precision(std::numeric_limits<double>::digits10);
+            //Info<< "Setting precision to " << std::numeric_limits<double>::digits10 << endl;
+            //loadFile.precision(std::numeric_limits<double>::digits10);
+            //dispFile.precision(std::numeric_limits<double>::digits10);
+            loadFile.precision(8);
+            dispFile.precision(8);
 
             // get initial configuration
             double posi[3], roti[3];
@@ -157,6 +159,8 @@ namespace BD
     // - writes displacement at the starting time step to disp.out
     void updateNodePositions()
     {
+        Info<< "Updating node positions from BeamDyn" << endl;
+
         scalarList &r    = *r_ptr;
         vectorList &pos0 = *pos0_ptr;
         vectorList &pos  = *pos_ptr;
@@ -167,7 +171,8 @@ namespace BD
 //        Info<< "Retrieving node positions for the next iteration" << endl;
         if(Pstream::master())
         {
-            if (!first) dispFile << currentTime;
+            if (first) Info<< "Initial displacements: ";
+            else dispFile << currentTime;
 
             // --loop over nodes in the BeamDyn blade model (assumed single element)
             //   TODO: handle multiple elements
@@ -197,7 +202,16 @@ namespace BD
 
                 r[inode] = posi[bladeDir];
 
-                if (!first) // don't need to write out initial config, either 0's or repeated on restart
+                if (first) // print out initial config, either 0's or (hopefully) repeated on restart
+                {
+                    Info<< " " << lin_disp[0] 
+                        << " " << lin_disp[1] 
+                        << " " << lin_disp[2]
+                        << " " << 180/pi*roti[0] 
+                        << " " << 180/pi*roti[1] 
+                        << " " << 180/pi*roti[2];
+                }
+                else // write subsequent displacements to file
                 {
                     dispFile << " " << lin_disp[0] 
                              << " " << lin_disp[1] 
@@ -209,7 +223,8 @@ namespace BD
 
             }// loop over beam nodes
 
-            if (!first) dispFile << std::endl;
+            if (first) Info<< endl;
+            else dispFile << std::endl;
 
         }// if Pstream::master
 
@@ -291,6 +306,8 @@ namespace BD
                              const volScalarField& p, 
                              const incompressible::turbulenceModel& turbulence )
     {
+        Info<< "Calculating section loads for BeamDyn" << endl;
+
         scalarList &r = *r_ptr;
         scalar p0( pRef / rhoRef );
 
