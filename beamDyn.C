@@ -22,7 +22,6 @@ namespace BD
             beamDynStart( &t0, &dt );
             beamDynGetNnodes( &nnodes ); // total number of nodes in beam model
             Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
-
         }
 
         // initialize arrays for storing configuration
@@ -40,6 +39,7 @@ namespace BD
         {
             if (t0 > 0)
             {
+                Info<< "Time = " << t0 << ", attempting restart" << endl;
                 std::string rstFile("BeamDynState_" + Foam::Time::timeName(t0) + ".dat");
                 if (FILE *file = fopen(rstFile.c_str(), "r")) {
                     fclose(file);
@@ -68,6 +68,7 @@ namespace BD
 
             // get initial configuration
             double posi[3], roti[3];
+            Info<< "Initial linear/angular position:" << endl;
             for( int inode=0; inode < nnodes; ++inode )
             {
                 beamDynGetInitNode0Position( &inode, posi, roti );
@@ -75,6 +76,13 @@ namespace BD
                     (*pos0_ptr)[inode][i] = posi[i];
                     (*rot0_ptr)[inode][i] = roti[i];
                 }
+                Info<< " " << posi[0] 
+                    << " " << posi[1] 
+                    << " " << posi[2]
+                    << " " << 180/pi*roti[0] 
+                    << " " << 180/pi*roti[1] 
+                    << " " << 180/pi*roti[2]
+                    << endl;
             }
 
         } //if Pstream master
@@ -163,62 +171,75 @@ namespace BD
 
         scalarList &r    = *r_ptr;
         vectorList &pos0 = *pos0_ptr;
+        //vectorList &rot0 = *rot0_ptr; // not used
         vectorList &pos  = *pos_ptr;
-        vectorList &rot0 = *rot0_ptr;
         vectorList &rot  = *rot_ptr;
         vectorList &disp = *disp_ptr;
 
 //        Info<< "Retrieving node positions for the next iteration" << endl;
         if(Pstream::master())
         {
-            if (first) Info<< "Initial displacements: ";
+            if (first) Info<< "Initial displacements from BeamDyn lib [m,deg]: " << endl;
             else dispFile << currentTime;
 
             // --loop over nodes in the BeamDyn blade model (assumed single element)
             //   TODO: handle multiple elements
-            double posi[3], roti[3];
+//            double posi[3], roti[3];
+            double lin_disp[3], ang_disp[3];
+            double ang;
             for( int inode=0; inode<nnodes; ++inode ) 
             {
                 // get node position and angle [rad]
-                beamDynGetNode0Position( &inode, posi, roti );
+//                beamDynGetNode0Position( &inode, posi, roti );
+//
+//                for( int dir=0; dir<3; ++dir )
+//                {
+//                    pos[inode].component(dir) = posi[dir];
+//                    rot[inode].component(dir) = roti[dir];
+//                }
+//
+//                // get linear/angular displacements
+//                vector lin_disp( pos[inode] - pos0[inode] );
+//                vector ang_disp( rot[inode] - rot0[inode] );
 
-                for( int dir=0; dir<3; ++dir )
-                {
-                    pos[inode].component(dir) = posi[dir];
-                    rot[inode].component(dir) = roti[dir];
-                }
+                // get node linear/angular displacement [m, rad]
+                beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
 
-                // get linear/angular displacements
-                vector lin_disp( pos[inode] - pos0[inode] );
-                vector ang_disp( rot[inode] - rot0[inode] );
+                //TODO: handle general 3D rotations
+//                const scalar ang = ang_disp.component(0);   // positive is nose up
+//                disp[inode].component(0) = 0.0;             // assume no spanwise deformation (in 2D)
+//                disp[inode].component(2) =                  // chordwise (TE->LE) displacement
+//                    lin_disp.component(2)*Foam::cos(ang) + lin_disp.component(1)*Foam::sin(ang);
+//                disp[inode].component(1) =                  // normal displacement
+//                   -lin_disp.component(2)*Foam::sin(ang) + lin_disp.component(1)*Foam::cos(ang);
+//
+//                r[inode] = posi[bladeDir];
 
-                //TODO: handle 3D rotations
-                const scalar ang = ang_disp.component(0);   // positive is nose up
-                disp[inode].component(0) = 0.0;             // assume no spanwise deformation (in 2D)
-                disp[inode].component(2) =                  // chordwise (TE->LE) displacement
-                    lin_disp.component(2)*Foam::cos(ang) + lin_disp.component(1)*Foam::sin(ang);
-                disp[inode].component(1) =                  // normal displacement
-                   -lin_disp.component(2)*Foam::sin(ang) + lin_disp.component(1)*Foam::cos(ang);
+                //TODO: handle general 3D rotations
+                ang = ang_disp[0];   // positive is nose up
+                disp[inode].component(0) = 0.0;                                                      // assume no spanwise deformation (in 2D)
+                disp[inode].component(2) =  lin_disp[2]*Foam::cos(ang) + lin_disp[1]*Foam::sin(ang); // chordwise (TE->LE) displacement
+                disp[inode].component(1) = -lin_disp[2]*Foam::sin(ang) + lin_disp[1]*Foam::cos(ang); // normal displacement
 
-                r[inode] = posi[bladeDir];
+                r[inode] = pos0[inode][bladeDir] + disp[inode].component(bladeDir);
 
-                if (first) // print out initial config, either 0's or (hopefully) repeated on restart
+                if (first) // print out initial displaced config, either 0's or (hopefully) repeated on restart
                 {
                     Info<< " " << lin_disp[0] 
                         << " " << lin_disp[1] 
                         << " " << lin_disp[2]
-                        << " " << 180/pi*roti[0] 
-                        << " " << 180/pi*roti[1] 
-                        << " " << 180/pi*roti[2];
+                        << " " << 180/pi*ang_disp[0] 
+                        << " " << 180/pi*ang_disp[1] 
+                        << " " << 180/pi*ang_disp[2] << endl;
                 }
                 else // write subsequent displacements to file
                 {
                     dispFile << " " << lin_disp[0] 
                              << " " << lin_disp[1] 
                              << " " << lin_disp[2];
-                    dispFile << " " << 180/pi*roti[0] 
-                             << " " << 180/pi*roti[1] 
-                             << " " << 180/pi*roti[2];
+                    dispFile << " " << 180/pi*ang_disp[0] 
+                             << " " << 180/pi*ang_disp[1] 
+                             << " " << 180/pi*ang_disp[2];
                 }
 
             }// loop over beam nodes
