@@ -50,7 +50,11 @@ namespace BD
     scalar  bladeR;
     vector  origin;
 
+    Switch  twoD;
+
     scalar  loadMultiplier;
+
+    vector  prescribed_max_deflection;
 
     // global coupling variables
 
@@ -77,17 +81,18 @@ namespace BD
     // member functions
 
     void start( double t0, double dt );
-    void stop();
-    void update( double t, double dt );
-
-    void updateNodePositions();
-
     void calculateShapeFunctions( const pointField& pf );
 
     void updateSectionLoads( const dynamicFvMesh& mesh, 
                              const volScalarField& p, 
                              const incompressible::turbulenceModel& turbulence );
 
+    void update( double t, double dt );
+    void updatePrescribedDeflection( double t );
+
+    void updateNodePositions();
+
+    void stop();
 }
 
 #ifdef NoRepository

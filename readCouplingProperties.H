@@ -49,10 +49,13 @@ Info<< "  Reference pressure : " << BD::pRef << endl;
 BD::bladeDir = couplingProperties.lookupOrDefault<label>("bladeDir",0);
 Info<< "  Blade axis : " << BD::bladeDir << endl;
 
+BD::twoD = couplingProperties.lookupOrDefault<Switch>("twoD",0);
+Info<< "  Constrain rotation to about the blade axis (2D) : " << BD::twoD << endl;
+
 //scalar bladeR( couplingProperties.lookupOrDefault("R",-1) );
 //scalar bladeR0( couplingProperties.lookupOrDefault("R0",-1) );
-BD::bladeR0 = couplingProperties.lookupOrDefault("R0",-1);
-BD::bladeR  = couplingProperties.lookupOrDefault("R",-1);
+BD::bladeR0 = couplingProperties.lookupOrDefault<scalar>("R0",-1);
+BD::bladeR  = couplingProperties.lookupOrDefault<scalar>("R",-1);
 
 //dimensionedVector
 //origin( 
@@ -66,4 +69,18 @@ Info<< "  Origin (moment reference) : " << BD::origin << endl;
 //scalar loadMultiplier( couplingProperties.lookupOrDefault<scalar>("loadMultiplier",1.0) );
 BD::loadMultiplier = couplingProperties.lookupOrDefault<scalar>("loadMultiplier",1.0);
 Info<< "  Load multiplier (FOR DEVELOPMENT) : " << BD::loadMultiplier << endl;
+
+Switch fluidSolve = couplingProperties.lookupOrDefault<Switch>("fluidSolve",1);
+Switch beamSolve = couplingProperties.lookupOrDefault<Switch>("beamSolve",1);
+if(!fluidSolve) Info<< "  SKIPPING fluid solution" << endl;
+if(!beamSolve) Info<< "  SKIPPING structural dynamics solution" << endl;
+
+BD::prescribed_max_deflection = couplingProperties.lookupOrDefault<vector>
+(
+    "prescribed_max_deflection",
+    vector::zero
+);
+Info<< "  Prescribed max deflection (when beamSolve==0): " 
+    << BD::prescribed_max_deflection << endl;
+
 

@@ -97,54 +97,67 @@ int main(int argc, char *argv[])
 
         Info<< "Time = " << runTime.timeName() << nl << endl;
 
+        // Prescribe motion here for the deformation testing (SOWE2015)
+        if (!beamSolve)
+        {
+            BD::updatePrescribedDeflection( runTime.timeOutputValue() );
+        }
+
         // Displacements are updated through the beamDynInterface boundary condition
         // Note: there should not be any displacement for the first time step
+        Info<< "Performing mesh update" << endl;
         mesh.update();
 
-        // Calculate absolute flux from the mapped surface velocity
-        phi = mesh.Sf() & Uf;
-
-        if (mesh.changing() && correctPhi)
+        if (fluidSolve)
         {
-            #include "correctPhi.H"
-        }
+            // Calculate absolute flux from the mapped surface velocity
+            phi = mesh.Sf() & Uf;
 
-        // Make the flux relative to the mesh motion
-        fvc::makeRelative(phi, U);
-
-        if (mesh.changing() && checkMeshCourantNo)
-        {
-            #include "meshCourantNo.H"
-        }
-
-        // --- Pressure-velocity PIMPLE corrector loop
-        while (pimple.loop())
-        {
-            #include "UEqn.H"
-
-            // --- Pressure corrector loop
-            while (pimple.correct())
+            if (mesh.changing() && correctPhi)
             {
-                #include "pEqn.H"
+                #include "correctPhi.H"
             }
 
-            if (pimple.turbCorr())
+            // Make the flux relative to the mesh motion
+            fvc::makeRelative(phi, U);
+
+            if (mesh.changing() && checkMeshCourantNo)
             {
-                turbulence->correct();
+                #include "meshCourantNo.H"
+            }
+
+            // --- Pressure-velocity PIMPLE corrector loop
+            while (pimple.loop())
+            {
+                #include "UEqn.H"
+
+                // --- Pressure corrector loop
+                while (pimple.correct())
+                {
+                    #include "pEqn.H"
+                }
+
+                if (pimple.turbCorr())
+                {
+                    turbulence->correct();
+                }
             }
         }
 
+        Info<< "Writing output" << endl;
         runTime.write();
 
         //
         // additional fsi steps
         //
 
-        BD::updateSectionLoads( mesh, p, turbulence );
-        BD::update( runTime.timeOutputValue(), runTime.deltaT().value() );
-        
-        BD::write( runTime.outputTime(), runTime.timeName() );
-
+        if (beamSolve)
+        {
+            BD::updateSectionLoads( mesh, p, turbulence );
+            BD::update( runTime.timeOutputValue(), runTime.deltaT().value() );
+            
+            BD::write( runTime.outputTime(), runTime.timeName() );
+        }
 
         Info<< nl
             << "ExecutionTime = " << runTime.elapsedCpuTime() << " s"

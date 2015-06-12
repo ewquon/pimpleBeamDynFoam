@@ -141,6 +141,53 @@ namespace BD
 //        Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << nl << endl;
         updateNodePositions();
     }
+    //*********************************************************************************************
+
+    void updatePrescribedDeflection( double t )
+    {
+        if(Pstream::master()) 
+        {
+            // prescribed deflection for testing
+            // y = ymax * (x/L)^2
+            //
+            // - at t=1.0, deflection is 100%
+            // - calculate shortening of the blade, normalized by blade length:
+            // b = (3*a**4 + sqrt(9*a**8+2*a**6))**(1./3.)
+            // xmax = b/2**(2./3.)/a**2 - 1/2**(1./3.)/b
+
+            double L = bladeR - bladeR0;
+            double a=2*prescribed_max_deflection[1]*t; // prescribed deflection only in y-dir for now
+            double b = Foam::pow( 3*Foam::pow(a,4) 
+                                + Foam::sqrt( 9*Foam::pow(a,8) + 2*Foam::pow(a,6) )
+                             ,1.0/3.0);
+            double xmax = L * ( b/Foam::pow(2,2.0/3.0)/pow(a,2) - 1.0/(b*pow(2,1.0/3.0)) );
+            double ymax = L * prescribed_max_deflection[1]*t;
+            double x0[3], x[3], tmp[3], u[3];
+            for (int i=0; i<3; ++i) { u[i] = 0.0; }
+
+            Info<< "Prescribing tip deflection dx,dy = "
+                << xmax << " " << prescribed_max_deflection[1]*t << endl;
+            for (int inode=0; inode<nnodes; ++inode)
+            {
+                beamDynGetInitNode0Position( &inode, x0, tmp );
+                beamDynGetNode0Position( &inode, x, tmp );
+                double xi = x[bladeDir]/L;
+
+                // NOTE: prescribed deflection is only in y-dir for now
+                //       bladeDir is implied to be x-dir
+                u[bladeDir] = xi * xmax - x0[bladeDir];
+                u[1] = ymax*xi*xi - x0[1];
+                beamDynSetDisplacement( &inode, u );
+
+                // Since we're prescribing motion and not actually running the BeamDyn solver,
+                // the rotation matrix is never actually updated. We manually set it here.
+                //double dydx = a*xi;
+                double ang = Foam::atan(a*xi);
+                beamDynSetZRotationMatrix( &inode, &ang );
+            }
+        }
+        updateNodePositions();
+    }
 
     //*********************************************************************************************
 
@@ -186,45 +233,72 @@ namespace BD
             //   TODO: handle multiple elements
 //            double posi[3], roti[3];
             double lin_disp[3], ang_disp[3];
-            double ang;
+            //double ang;
+            double R[9]; //rotation matrix from BeamDyn
             for( int inode=0; inode<nnodes; ++inode ) 
             {
-                // get node position and angle [rad]
-//                beamDynGetNode0Position( &inode, posi, roti );
-//
-//                for( int dir=0; dir<3; ++dir )
-//                {
-//                    pos[inode].component(dir) = posi[dir];
-//                    rot[inode].component(dir) = roti[dir];
-//                }
-//
-//                // get linear/angular displacements
-//                vector lin_disp( pos[inode] - pos0[inode] );
-//                vector ang_disp( rot[inode] - rot0[inode] );
 
                 // get node linear/angular displacement [m, rad]
+                //   returns rotation_angle - initial_rotation_angle
+                //   initial_rotation_angle should be stored in (*rot0_ptr) during start()
+                //   => this returns the wrong angular displacement at the zeroth step
+                //      but is this ever used???
                 beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
 
-                //TODO: handle general 3D rotations
-//                const scalar ang = ang_disp.component(0);   // positive is nose up
-//                disp[inode].component(0) = 0.0;             // assume no spanwise deformation (in 2D)
-//                disp[inode].component(2) =                  // chordwise (TE->LE) displacement
-//                    lin_disp.component(2)*Foam::cos(ang) + lin_disp.component(1)*Foam::sin(ang);
-//                disp[inode].component(1) =                  // normal displacement
-//                   -lin_disp.component(2)*Foam::sin(ang) + lin_disp.component(1)*Foam::cos(ang);
-//
-//                r[inode] = posi[bladeDir];
+// 2D operation, e.g. wingMotion case
+//                ang = ang_disp[0];   // positive is nose up
+//                disp[inode].component(0) = 0.0;                                                      // assume no spanwise deformation (in 2D)
+//                disp[inode].component(2) =  lin_disp[2]*Foam::cos(ang) + lin_disp[1]*Foam::sin(ang); // chordwise (TE->LE) displacement
+//                disp[inode].component(1) = -lin_disp[2]*Foam::sin(ang) + lin_disp[1]*Foam::cos(ang); // normal displacement
+//                r[inode] = pos0[inode][bladeDir] + disp[inode].component(bladeDir);
 
-                //TODO: handle general 3D rotations
-                ang = ang_disp[0];   // positive is nose up
-                disp[inode].component(0) = 0.0;                                                      // assume no spanwise deformation (in 2D)
-                disp[inode].component(2) =  lin_disp[2]*Foam::cos(ang) + lin_disp[1]*Foam::sin(ang); // chordwise (TE->LE) displacement
-                disp[inode].component(1) = -lin_disp[2]*Foam::sin(ang) + lin_disp[1]*Foam::cos(ang); // normal displacement
+                beamDynGetNode0RotationMatrix( &inode, R );
+                // these are identity before the first iteration and approximately the identity matrix afterwards
+                //cout << "DEBUG R matrix " << inode << " : \n";
+                //cout << " R=[" << R[0] << " " << R[1] << " " << R[2] << "; ...\n";
+                //cout << "    " << R[3] << " " << R[4] << " " << R[5] << "; ...\n";
+                //cout << "    " << R[6] << " " << R[7] << " " << R[8] << "]\n";
 
+                disp[inode] = vector::zero;
+                for( int j=0; j<3; ++j ) {
+                    for( int i=0; i<3; ++i )
+                    {
+                        disp[inode].component(j) += R[3*j+i] * lin_disp[i];
+                    }
+
+                    //disp[inode].component(j) = lin_disp[j];
+                }
+                if(twoD) disp[inode].component(bladeDir) = 0.0;
+                //Info<< "DEBUG rotated disp at " << inode << " : " << disp[inode] << endl;
+
+                // used for sectional loads calculation
                 r[inode] = pos0[inode][bladeDir] + disp[inode].component(bladeDir);
+
+// DEBUG
+//                Info<< "DEBUG node " << inode << " (lin_disp) :" 
+//                    << " " << lin_disp[0]
+//                    << " " << lin_disp[1]
+//                    << " " << lin_disp[2]
+//                    << endl;
+//                Info<< "DEBUG node " << inode << " (OLD) :" 
+//                    << " " << 0.0
+//                    << " " << -lin_disp[2]*Foam::sin(ang_disp[0]) + lin_disp[1]*Foam::cos(ang_disp[0]) // normal displacement
+//                    << " " <<  lin_disp[2]*Foam::cos(ang_disp[0]) + lin_disp[1]*Foam::sin(ang_disp[0]) // chordwise (TE->LE) displacement
+//                    << endl;
+//                Info<< "DEBUG node " << inode << " (NEW) :" 
+//                    << " " << disp[inode].component(0)
+//                    << " " << disp[inode].component(1)
+//                    << " " << disp[inode].component(2)
+//                    << endl;
+
+// DEBUG
+// KEEP IT SIMPLE STUPID
+                disp[inode] = vector(0,lin_disp[1],0);
 
                 if (first) // print out initial displaced config, either 0's or (hopefully) repeated on restart
                 {
+                    //NOTE: for prescribed motion, since the beamdyn solve routine isn't called, the rotation parameters
+                    //  are not properly updated so ang_disp will be inaccurate; just use the rotation matrix R instead.
                     Info<< " " << lin_disp[0] 
                         << " " << lin_disp[1] 
                         << " " << lin_disp[2]
@@ -266,11 +340,18 @@ namespace BD
         scalarList &r = *r_ptr;
         if( bladeR0 < 0.0 ) bladeR0 = r[0];
         if( bladeR  < 0.0 ) bladeR  = r[nnodes-1];
+        Info<< "r: " << r << endl;
         //Pout<< "Blade span : " << bladeR0 << " " << bladeR << endl;
 
         if( nSurfNodes > 0 )
         {
             Pout << "calculating shape functions for " << nSurfNodes << " surface nodes" << endl;
+
+            // DEBUG
+            scalar hmin( 9e9);
+            scalar hmax(-9e9);
+            scalar smin( 9e9);
+            scalar smax(-9e9);
 
             double s;
             double L_2 = (bladeR-bladeR0)/2.0;
@@ -278,14 +359,19 @@ namespace BD
 
             double num, den;
             double GLL[nnodes];
+            Info<< "GLL pts : "; // DEBUG
             for( int i=0; i<nnodes; ++i )
             {
                 GLL[i] = 2.0*(r[i]-r[0])/(r[nnodes-1]-r[0]) - 1.0;
+                Info<< " " << GLL[i];
             }
+            Info<< endl;
 
             forAll( pf, ptI )
             {
                 s = ( pf[ptI].component(bladeDir) - bladeR0 ) / L_2 - 1.0;
+                smin = min(smin,s);
+                smax = max(smax,s);
                 //beamDynGetShapeFunctions( &s, hi ); // this only works on the master node...
                 //vvvvvvvvvv Code snippet from BeamDyn diffmtc subroutine vvvvvvvvvv
                 for( int j=0; j<nnodes; ++j )
@@ -293,7 +379,7 @@ namespace BD
                     hi[j] = 0.0;
                     num = 1.0;
                     den = 1.0;
-                    if( abs(s-GLL[j]) <= eps )
+                    if( fabs(s-GLL[j]) <= eps )
                     {
                         hi[j] = 1.0;
                     }
@@ -312,12 +398,20 @@ namespace BD
                 }
                 //^^^^^^^^^^^^^^^^^^^ End of code snippet ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+                scalar hsum(0);
                 for( int inode=0; inode < nnodes; ++inode )
                 {
                     h_ptr[ptI*nnodes + inode] = hi[inode];
+                    hsum += hi[inode];
                 }
+                //Info<< hsum << endl; between 3 and 5?!?
+                hmin = min(hmin,hsum);
+                hmax = max(hmax,hsum);
 
             }// loop over surface nodes
+//            Pout<< "-- sum(h) : [ " << hmin << ", " << hmax << " ]" 
+//                << " for s : [ " << smin << ", " << smax << " ]"
+//                << endl;
         }
     }
 
