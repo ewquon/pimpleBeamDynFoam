@@ -68,14 +68,16 @@ namespace BD
     vectorList *pos0_ptr,*rot0_ptr; // starting position and orientation of beam nodes
     vectorList *pos_ptr, *rot_ptr;  // current position and orientation of beam nodes
     vectorList *disp_ptr;           // linear displacement at beam nodes
+    vectorList *adisp_ptr;          // angular displacement at beam nodes
     scalarList *r_ptr;              // spanwise coordinates of beam nodes
     double *h_ptr;                  // shape functions [ # CFD nodes * # BD nodes ]
 
     // access functions
 
     vectorList& disp() { return *disp_ptr; };
-    vectorList& pos() { return *pos_ptr; };
-    vectorList& rot() { return *rot_ptr; };
+    vectorList& adisp() { return *adisp_ptr; };
+//    vectorList& pos() { return *pos_ptr; };
+//    vectorList& rot() { return *rot_ptr; };
     scalarList& r() { return *r_ptr; };
     double* h() { return h_ptr; };
 

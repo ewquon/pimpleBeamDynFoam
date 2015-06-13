@@ -32,6 +32,7 @@ namespace BD
         pos_ptr  = new vectorList(nnodes, vector::zero);
         rot_ptr  = new vectorList(nnodes, vector::zero);
         disp_ptr = new vectorList(nnodes, vector::zero);
+        adisp_ptr= new vectorList(nnodes, vector::zero);
 
         // perform restart read of saved state data if necessary
         // open disp.out and load.out for writing later
@@ -115,6 +116,7 @@ namespace BD
         delete pos_ptr;
         delete rot_ptr;
         delete disp_ptr;
+        delete adisp_ptr;
         delete r_ptr;
         delete [] h_ptr;
 
@@ -162,7 +164,12 @@ namespace BD
                              ,1.0/3.0);
             double xmax = L * ( b/Foam::pow(2,2.0/3.0)/pow(a,2) - 1.0/(b*pow(2,1.0/3.0)) );
             double ymax = L * prescribed_max_deflection[1]*t;
-            double x[3], tmp[3], u[3];
+
+            double x[3], tmp[3], u[3];//, p[3];
+            for (int i=0; i<3; ++i)
+            {
+                u[i] = 0;
+            }
 
             Info<< "Prescribed tip position at time " << t 
                 << " : x/L,y/L = " << xmax/L << " " << ymax/L 
@@ -245,6 +252,7 @@ namespace BD
         vectorList &pos  = *pos_ptr;
         vectorList &rot  = *rot_ptr;
         vectorList &disp = *disp_ptr;
+        vectorList &adisp= *adisp_ptr;
 
 //        Info<< "Retrieving node positions for the next iteration" << endl;
         if(Pstream::master())
@@ -257,7 +265,7 @@ namespace BD
 //            double posi[3], roti[3];
             double lin_disp[3], ang_disp[3];
             //double ang;
-            double R[9]; //rotation matrix from BeamDyn
+//            double R[9]; //rotation matrix from BeamDyn
             for( int inode=0; inode<nnodes; ++inode ) 
             {
 
@@ -267,9 +275,10 @@ namespace BD
                 //   => this returns the wrong angular displacement at the zeroth step
                 //      but is this ever used???
                 beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
-                Info<< "node " << inode << " : lin_disp " 
-                    << "(" << lin_disp[0] << " " << lin_disp[1] << " " << lin_disp[2] << ")" 
-                    << endl;
+// DEBUG
+//                Info<< "node " << inode << " : lin_disp " 
+//                    << "(" << lin_disp[0] << " " << lin_disp[1] << " " << lin_disp[2] << ")" 
+//                    << endl;
 
 // 2D operation, e.g. wingMotion case
 //                ang = ang_disp[0];   // positive is nose up
@@ -278,24 +287,30 @@ namespace BD
 //                disp[inode].component(1) = -lin_disp[2]*Foam::sin(ang) + lin_disp[1]*Foam::cos(ang); // normal displacement
 //                r[inode] = pos0[inode][bladeDir] + disp[inode].component(bladeDir);
 
-                beamDynGetNode0RotationMatrix( &inode, R );
-                // these are identity before the first iteration and approximately the identity matrix afterwards
-                Info << "DEBUG R matrix " << inode << " : \n";
-                Info << " R=[" << R[0] << " " << R[1] << " " << R[2] << "; ...\n";
-                Info << "    " << R[3] << " " << R[4] << " " << R[5] << "; ...\n";
-                Info << "    " << R[6] << " " << R[7] << " " << R[8] << "]\n";
-
-                disp[inode] = vector::zero;
-                for( int j=0; j<3; ++j ) {
-                    for( int i=0; i<3; ++i )
-                    {
-                        disp[inode].component(j) += R[3*j+i] * lin_disp[i];
-                    }
-
-                    //disp[inode].component(j) = lin_disp[j];
+// ROTATION SHOULD BE APPLIED FOR THE POINTS ON THE INTERFACE PATCH!!!
+//                beamDynGetNode0RotationMatrix( &inode, R );
+// DEBUG
+// these are identity before the first iteration and approximately the identity matrix afterwards
+//                Info << "DEBUG R matrix " << inode << " : \n";
+//                Info << " R=[" << R[0] << " " << R[1] << " " << R[2] << "; ...\n";
+//                Info << "    " << R[3] << " " << R[4] << " " << R[5] << "; ...\n";
+//                Info << "    " << R[6] << " " << R[7] << " " << R[8] << "]\n";
+//
+//                disp[inode] = vector::zero;
+//                for( int j=0; j<3; ++j ) {
+//                    for( int i=0; i<3; ++i )
+//                    {
+//                        disp[inode].component(j) += R[3*j+i] * lin_disp[i];
+//                    }
+//
+//                    //disp[inode].component(j) = lin_disp[j];
+//                }
+//                if(twoD) disp[inode].component(bladeDir) = 0.0;
+                for( int i=0; i<3; ++i )
+                {
+                    disp[inode].component(i) = lin_disp[i];
+                    adisp[inode].component(i)= ang_disp[i];
                 }
-                if(twoD) disp[inode].component(bladeDir) = 0.0;
-                //Info<< "DEBUG rotated disp at " << inode << " : " << disp[inode] << endl;
 
                 // used for sectional loads calculation
                 r[inode] = pos0[inode][bladeDir] + disp[inode].component(bladeDir);
@@ -317,12 +332,6 @@ namespace BD
 //                    << " " << disp[inode].component(2)
 //                    << endl;
 
-// DEBUG
-                Info<< "!!! KEEP IT SIMPLE, STUPID !!!";
-                Info<< "  " << disp[inode] << " ~ " 
-                    << "(" << lin_disp[0] << " " << lin_disp[1] << " " << lin_disp[2] << ")" 
-                    << endl;
-                //disp[inode] = vector(0,lin_disp[1],0);
 
                 if (first) // print out initial displaced config, either 0's or (hopefully) repeated on restart
                 {
@@ -356,6 +365,7 @@ namespace BD
         Pstream::scatter(pos); // verified that this works
         Pstream::scatter(rot);
         Pstream::scatter(disp);
+        Pstream::scatter(adisp);
     }
 
     //*********************************************************************************************
