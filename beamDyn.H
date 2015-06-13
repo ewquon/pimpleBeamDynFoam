@@ -53,8 +53,9 @@ namespace BD
     Switch  twoD;
 
     scalar  loadMultiplier;
-
-    vector  prescribed_max_deflection;
+ 
+    vector  prescribed_max_deflection; // only works for y deflections for now
+    vector  prescribed_max_rotation;   // only works for x rotations for now, overwrites bending rotation if specified
 
     // global coupling variables
 

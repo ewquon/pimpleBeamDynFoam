@@ -80,7 +80,15 @@ BD::prescribed_max_deflection = couplingProperties.lookupOrDefault<vector>
     "prescribed_max_deflection",
     vector::zero
 );
+BD::prescribed_max_rotation = couplingProperties.lookupOrDefault<vector>
+(
+    "prescribed_max_rotation",
+    vector::zero
+);
 Info<< "  Prescribed max deflection (when beamSolve==0): " 
     << BD::prescribed_max_deflection << endl;
+Info<< "  Prescribed max rotation   (when beamSolve==0): " 
+    << BD::prescribed_max_rotation << endl;
+BD::prescribed_max_rotation *= Foam::constant::mathematical::pi/180;
 
 

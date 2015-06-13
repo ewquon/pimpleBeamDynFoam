@@ -162,28 +162,51 @@ namespace BD
                              ,1.0/3.0);
             double xmax = L * ( b/Foam::pow(2,2.0/3.0)/pow(a,2) - 1.0/(b*pow(2,1.0/3.0)) );
             double ymax = L * prescribed_max_deflection[1]*t;
-            double x0[3], x[3], tmp[3], u[3];
-            for (int i=0; i<3; ++i) { u[i] = 0.0; }
+            double x[3], tmp[3], u[3];
 
-            Info<< "Prescribing tip deflection dx,dy = "
-                << xmax << " " << prescribed_max_deflection[1]*t << endl;
+            Info<< "Prescribed tip position at time " << t 
+                << " : x/L,y/L = " << xmax/L << " " << ymax/L 
+                << endl;
+
             for (int inode=0; inode<nnodes; ++inode)
             {
-                beamDynGetInitNode0Position( &inode, x0, tmp );
+                //beamDynGetInitNode0Position( &inode, x0, tmp );
                 beamDynGetNode0Position( &inode, x, tmp );
-                double xi = x[bladeDir]/L;
+                //double xi = x[bladeDir]/L;
+                double s = (*pos0_ptr)[inode][bladeDir] / L; //parametric coordinate from 0 to 1
 
                 // NOTE: prescribed deflection is only in y-dir for now
                 //       bladeDir is implied to be x-dir
-                u[bladeDir] = xi * xmax - x0[bladeDir];
-                u[1] = ymax*xi*xi - x0[1];
+                u[bladeDir] = (xmax-L)*s; //xi * xmax - (*pos0_ptr)[inode][bladeDir];
+                u[1] = ymax*s*s - (*pos0_ptr)[inode][1];
+                u[2] = 0.0;
+
+// DEBUG
+//                Info<< "  initial position is " << (*pos0_ptr)[inode] 
+//                    << "  (s=" << s << ")"
+//                    << endl;
+//
+//                Info<< "  setting disp for node " << inode+1
+//                    << " at " << x[0] << " " << x[1] << " " << x[2]
+//                    << " to " << u[0] << " " << u[1] << " " << u[2]
+//                    << endl;
+
                 beamDynSetDisplacement( &inode, u );
 
                 // Since we're prescribing motion and not actually running the BeamDyn solver,
                 // the rotation matrix is never actually updated. We manually set it here.
                 //double dydx = a*xi;
-                double ang = Foam::atan(a*xi);
+                //double ang = Foam::atan(a*xi);
+                double ang = Foam::atan(a*s);
                 beamDynSetZRotationMatrix( &inode, &ang );
+
+                // For now, just overwrite the rotation matrix if we're doing a test with x-axis rotation
+                ang = prescribed_max_rotation[0];
+                if (ang != 0)
+                {
+                    Info<< "Prescribing twist angle " << ang*180/pi << endl;
+                    beamDynSetXRotationMatrix( &inode, &ang );
+                }
             }
         }
         updateNodePositions();
@@ -244,6 +267,9 @@ namespace BD
                 //   => this returns the wrong angular displacement at the zeroth step
                 //      but is this ever used???
                 beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
+                Info<< "node " << inode << " : lin_disp " 
+                    << "(" << lin_disp[0] << " " << lin_disp[1] << " " << lin_disp[2] << ")" 
+                    << endl;
 
 // 2D operation, e.g. wingMotion case
 //                ang = ang_disp[0];   // positive is nose up
@@ -254,10 +280,10 @@ namespace BD
 
                 beamDynGetNode0RotationMatrix( &inode, R );
                 // these are identity before the first iteration and approximately the identity matrix afterwards
-                //cout << "DEBUG R matrix " << inode << " : \n";
-                //cout << " R=[" << R[0] << " " << R[1] << " " << R[2] << "; ...\n";
-                //cout << "    " << R[3] << " " << R[4] << " " << R[5] << "; ...\n";
-                //cout << "    " << R[6] << " " << R[7] << " " << R[8] << "]\n";
+                Info << "DEBUG R matrix " << inode << " : \n";
+                Info << " R=[" << R[0] << " " << R[1] << " " << R[2] << "; ...\n";
+                Info << "    " << R[3] << " " << R[4] << " " << R[5] << "; ...\n";
+                Info << "    " << R[6] << " " << R[7] << " " << R[8] << "]\n";
 
                 disp[inode] = vector::zero;
                 for( int j=0; j<3; ++j ) {
@@ -292,8 +318,11 @@ namespace BD
 //                    << endl;
 
 // DEBUG
-// KEEP IT SIMPLE STUPID
-                disp[inode] = vector(0,lin_disp[1],0);
+                Info<< "!!! KEEP IT SIMPLE, STUPID !!!";
+                Info<< "  " << disp[inode] << " ~ " 
+                    << "(" << lin_disp[0] << " " << lin_disp[1] << " " << lin_disp[2] << ")" 
+                    << endl;
+                //disp[inode] = vector(0,lin_disp[1],0);
 
                 if (first) // print out initial displaced config, either 0's or (hopefully) repeated on restart
                 {

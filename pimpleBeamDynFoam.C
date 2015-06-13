@@ -86,6 +86,11 @@ int main(int argc, char *argv[])
 
     Info<< "\nStarting time loop\n" << endl;
 
+    // PARALLEL DEBUG
+//    int sleepFlag = 0;
+//    while (sleepFlag==0)
+//        sleep(5);
+
     while (runTime.run())
     {
         #include "readControls.H"
@@ -120,12 +125,15 @@ int main(int argc, char *argv[])
 
             // Make the flux relative to the mesh motion
             fvc::makeRelative(phi, U);
+        }
 
-            if (mesh.changing() && checkMeshCourantNo)
-            {
-                #include "meshCourantNo.H"
-            }
+        if (mesh.changing() && checkMeshCourantNo)
+        {
+            #include "meshCourantNo.H"
+        }
 
+        if (fluidSolve)
+        {
             // --- Pressure-velocity PIMPLE corrector loop
             while (pimple.loop())
             {
