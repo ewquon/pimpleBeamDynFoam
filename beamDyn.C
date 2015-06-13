@@ -158,64 +158,77 @@ namespace BD
             // xmax = b/2**(2./3.)/a**2 - 1/2**(1./3.)/b
 
             double L = bladeR - bladeR0;
-            double a=2*prescribed_max_deflection[1]*t; // prescribed deflection only in y-dir for now
-            double b = Foam::pow( 3*Foam::pow(a,4) 
-                                + Foam::sqrt( 9*Foam::pow(a,8) + 2*Foam::pow(a,6) )
-                             ,1.0/3.0);
-            double xmax = L * ( b/Foam::pow(2,2.0/3.0)/pow(a,2) - 1.0/(b*pow(2,1.0/3.0)) );
-            double ymax = L * prescribed_max_deflection[1]*t;
-
-            double x[3], tmp[3], u[3];//, p[3];
-            for (int i=0; i<3; ++i)
+            double a = 2*prescribed_max_deflection[1]*t; // prescribed deflection only in y-dir for now
+            double ang = prescribed_max_rotation[0]*currentDeltaT; // rotation increment
+            Info<< "current delta t : " << currentDeltaT << endl;
+            if (a != 0)
             {
-                u[i] = 0;
+                double b = Foam::pow( 3*Foam::pow(a,4) 
+                                    + Foam::sqrt( 9*Foam::pow(a,8) + 2*Foam::pow(a,6) )
+                                 ,1.0/3.0);
+                double xmax = L * ( b/Foam::pow(2,2.0/3.0)/pow(a,2) - 1.0/(b*pow(2,1.0/3.0)) );
+                double ymax = L * prescribed_max_deflection[1]*t;
+
+                double x[3], tmp[3], u[3];//, p[3];
+                for (int i=0; i<3; ++i)
+                {
+                    u[i] = 0;
+                }
+
+                Info<< "Prescribed tip position at time " << t 
+                    << " : x/L,y/L = " << xmax/L << " " << ymax/L 
+                    << " with twist increment = " << ang
+                    << endl;
+
+                for (int inode=0; inode<nnodes; ++inode)
+                {
+                    //beamDynGetInitNode0Position( &inode, x0, tmp );
+                    beamDynGetNode0Position( &inode, x, tmp );
+                    //double xi = x[bladeDir]/L;
+                    double s = (*pos0_ptr)[inode][bladeDir] / L; //parametric coordinate from 0 to 1
+
+                    // NOTE: prescribed deflection is only in y-dir for now
+                    //       bladeDir is implied to be x-dir
+                    u[bladeDir] = (xmax-L)*s; //xi * xmax - (*pos0_ptr)[inode][bladeDir];
+                    u[1] = ymax*s*s - (*pos0_ptr)[inode][1];
+                    u[2] = 0.0;
+
+    // DEBUG
+    //                Info<< "  initial position is " << (*pos0_ptr)[inode] 
+    //                    << "  (s=" << s << ")"
+    //                    << endl;
+    //
+    //                Info<< "  setting disp for node " << inode+1
+    //                    << " at " << x[0] << " " << x[1] << " " << x[2]
+    //                    << " to " << u[0] << " " << u[1] << " " << u[2]
+    //                    << endl;
+
+                    beamDynSetDisplacement( &inode, u );
+
+                    // Since we're prescribing motion and not actually running the BeamDyn solver,
+                    // the rotation matrix is never actually updated. We manually set it here.
+                    //double dydx = a*xi;
+                    //double ang = Foam::atan(a*xi);
+                    ang = Foam::atan(a*s);
+                    beamDynSetZRotationMatrix( &inode, &ang );
+
+                }
             }
 
-            Info<< "Prescribed tip position at time " << t 
-                << " : x/L,y/L = " << xmax/L << " " << ymax/L 
-                << endl;
-
-            for (int inode=0; inode<nnodes; ++inode)
+            // For now, just overwrite the rotation matrix if we're doing a test with x-axis rotation
+            if (ang != 0)
             {
-                //beamDynGetInitNode0Position( &inode, x0, tmp );
-                beamDynGetNode0Position( &inode, x, tmp );
-                //double xi = x[bladeDir]/L;
-                double s = (*pos0_ptr)[inode][bladeDir] / L; //parametric coordinate from 0 to 1
-
-                // NOTE: prescribed deflection is only in y-dir for now
-                //       bladeDir is implied to be x-dir
-                u[bladeDir] = (xmax-L)*s; //xi * xmax - (*pos0_ptr)[inode][bladeDir];
-                u[1] = ymax*s*s - (*pos0_ptr)[inode][1];
-                u[2] = 0.0;
-
-// DEBUG
-//                Info<< "  initial position is " << (*pos0_ptr)[inode] 
-//                    << "  (s=" << s << ")"
-//                    << endl;
-//
-//                Info<< "  setting disp for node " << inode+1
-//                    << " at " << x[0] << " " << x[1] << " " << x[2]
-//                    << " to " << u[0] << " " << u[1] << " " << u[2]
-//                    << endl;
-
-                beamDynSetDisplacement( &inode, u );
-
-                // Since we're prescribing motion and not actually running the BeamDyn solver,
-                // the rotation matrix is never actually updated. We manually set it here.
-                //double dydx = a*xi;
-                //double ang = Foam::atan(a*xi);
-                double ang = Foam::atan(a*s);
-                beamDynSetZRotationMatrix( &inode, &ang );
-
-                // For now, just overwrite the rotation matrix if we're doing a test with x-axis rotation
-                ang = prescribed_max_rotation[0];
-                if (ang != 0)
+                Info<< "Specifying twist increment = " << ang << endl;
+                for (int inode=0; inode<nnodes; ++inode)
                 {
-                    Info<< "Prescribing twist angle " << ang*180/pi << endl;
+//                    ang = prescribed_max_rotation[0]*t + (*rot0_ptr)[inode][0]; // this is a rotation angle, not the absolute orientation!
+//                    ang = prescribed_max_rotation[0]*currentDeltaT + (*rot0_ptr)[inode][0];
+//                    Info<< "Prescribing twist angle " << ang*180/pi << endl;
                     beamDynSetXRotationMatrix( &inode, &ang );
                 }
             }
         }
+
         updateNodePositions();
     }
 

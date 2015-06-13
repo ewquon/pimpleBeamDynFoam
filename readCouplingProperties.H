@@ -64,7 +64,7 @@ BD::bladeR  = couplingProperties.lookupOrDefault<scalar>("R",-1);
 //);
 //vector origin( couplingProperties.lookupOrDefault<vector>("origin",vector::zero) );
 BD::origin = couplingProperties.lookupOrDefault<vector>("origin",vector::zero);
-Info<< "  Origin (moment reference) : " << BD::origin << endl;
+Info<< "  Origin (rotation/moment reference) : " << BD::origin << endl;
 
 //scalar loadMultiplier( couplingProperties.lookupOrDefault<scalar>("loadMultiplier",1.0) );
 BD::loadMultiplier = couplingProperties.lookupOrDefault<scalar>("loadMultiplier",1.0);
