@@ -16,12 +16,6 @@
 #include <fstream>
 #include <limits>
 
-// We're already using namespace Foam from fvCFD.H
-//#ifndef namespaceFoam
-//#define namespaceFoam
-//    using namespace Foam;
-//#endif
-
 namespace BD
 {
 
@@ -31,6 +25,7 @@ namespace BD
 #endif
 
     NamespaceName("BeamDyn");
+
     const scalar pi(Foam::constant::mathematical::pi);
     const scalar eps(1.0e-8);
     bool first = true;
@@ -76,8 +71,6 @@ namespace BD
 
     vectorList& disp() { return *disp_ptr; };
     vectorList& adisp() { return *adisp_ptr; };
-//    vectorList& pos() { return *pos_ptr; };
-//    vectorList& rot() { return *rot_ptr; };
     scalarList& r() { return *r_ptr; };
     double* h() { return h_ptr; };
 
