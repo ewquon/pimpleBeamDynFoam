@@ -1,0 +1,3 @@
+pimpleBeamDynFoam.C
+
+EXE = $(FOAM_APPBIN)/pimpleBeamDynFoam
