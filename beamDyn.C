@@ -120,7 +120,7 @@ namespace BD
         delete r_ptr;
         delete [] h_ptr;
 
-        if (Pstream::master)
+        if (Pstream::master())
         {
             loadFile.close();
             dispFile.close();
@@ -486,13 +486,14 @@ namespace BD
         // calculate shear stress
         //   note: devReff returns the effective stress tensor including the laminar stress
         //   note: face normals point _outside_ the computational domain
+
 //        Info<< "Calculating surface shear stresses" << endl;
-        const volSymmTensorField Reff(turbulence.devReff());
-//      vectorField bladePatchShearStress = 
-//          (
-//              -mesh.Sf().boundaryField()[interfacePatchID]
-//              /mesh.magSf().boundaryField()[interfacePatchID]
-//          ) & Reff.boundaryField()[interfacePatchID];
+//        const volSymmTensorField Reff(turbulence.devReff());
+//        vectorField bladePatchShearStress = 
+//            (
+//                -mesh.Sf().boundaryField()[interfacePatchID]
+//                /mesh.magSf().boundaryField()[interfacePatchID]
+//            ) & Reff.boundaryField()[interfacePatchID];
 
         // Face normals point into solid surface, i.e., outward from fluid volume, 
         // i.e. the direction the fluid is pushing on the wall.
@@ -500,9 +501,12 @@ namespace BD
         // in Foam::forces::calcForcesMoment() at
         //   ~/OpenFOAM/OpenFOAM-2.3.1/src/postProcessing/functionObjects/forces/forces/forces.C
         // - also, no need to normalize by magSf since we multiply by mag(Sf) later
-        vectorField bladePatchShearStress = 
-            mesh.Sf().boundaryField()[interfacePatchID]
-            & Reff.boundaryField()[interfacePatchID];
+        const volSymmTensorField Reff(turbulence.devReff());
+        //THIS DOESN'T COMPILE WITH CLANG:
+        //vectorField bladePatchShearStress = 
+        //    mesh.Sf().boundaryField()[interfacePatchID]
+        //    & Reff.boundaryField()[interfacePatchID];
+        vectorField bladePatchShearStress( bladePatchNormals & Reff.boundaryField()[interfacePatchID] );
 
         //
         // --loop over nodes in the BeamDyn blade model, assumed single element
