@@ -82,7 +82,8 @@ int main(int argc, char *argv[])
 
     // calculate shape functions once and for all at all surface nodes where 
     // we will need to interpolate the beam displacement solution
-    BD::calculateShapeFunctions( interfacePatch.localPoints() );
+    //BD::calculateShapeFunctions( interfacePatch.localPoints() );
+    BD::calculateShapeFunctions( mesh.boundaryMesh()[BD::interfacePatchID].localPoints() );
 
     Info<< "\nStarting time loop\n" << endl;
 
