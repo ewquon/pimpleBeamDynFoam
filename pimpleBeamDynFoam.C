@@ -46,7 +46,7 @@ Description
 #include "fvIOoptionList.H"
 
 // additional includes
-#include "beamDyn.H" // BD namespace
+#include "beamDynInterface.H" // BD namespace
 #include "scalar.H"
 #include "vectorList.H"
 #include "pointPatchFields.H"
@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
     #include "CourantNo.H"
     #include "setInitialDeltaT.H"
 
-    #include "readCouplingProperties.H" // for BeamDyn coupling
+    #include "readCouplingProperties.H" // for BeamDyn coupling< calls BD::readInputs()
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -83,7 +83,8 @@ int main(int argc, char *argv[])
     // calculate shape functions once and for all at all surface nodes where 
     // we will need to interpolate the beam displacement solution
     //BD::calculateShapeFunctions( interfacePatch.localPoints() );
-    BD::calculateShapeFunctions( mesh.boundaryMesh()[BD::interfacePatchID].localPoints() );
+    label interfacePatchID = BD::interfacePatchID();
+    BD::calculateShapeFunctions( mesh.boundaryMesh()[interfacePatchID].localPoints() );
 
     Info<< "\nStarting time loop\n" << endl;
 
