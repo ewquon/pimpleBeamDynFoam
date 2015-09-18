@@ -46,7 +46,9 @@ Description
 #include "fvIOoptionList.H"
 
 // additional includes
+
 #include "beamDynInterface.H" // BD namespace
+
 #include "scalar.H"
 #include "vectorList.H"
 #include "pointPatchFields.H"
@@ -74,7 +76,7 @@ int main(int argc, char *argv[])
     #include "CourantNo.H"
     #include "setInitialDeltaT.H"
 
-    #include "readCouplingProperties.H" // for BeamDyn coupling< calls BD::readInputs()
+    #include "readCouplingProperties.H" // for BeamDyn coupling, calls BD::readInputs()
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -82,9 +84,9 @@ int main(int argc, char *argv[])
 
     // calculate shape functions once and for all at all surface nodes where 
     // we will need to interpolate the beam displacement solution
-    //BD::calculateShapeFunctions( interfacePatch.localPoints() );
     label interfacePatchID = BD::interfacePatchID();
     BD::calculateShapeFunctions( mesh.boundaryMesh()[interfacePatchID].localPoints() );
+    BD::calculateInitialDisplacementVectors( mesh.boundaryMesh()[interfacePatchID].localPoints() );
 
     Info<< "\nStarting time loop\n" << endl;
 
@@ -105,10 +107,10 @@ int main(int argc, char *argv[])
         Info<< "Time = " << runTime.timeName() << nl << endl;
 
         // Prescribe motion here for the deformation testing (SOWE2015)
-        if (!beamSolve)
-        {
-            BD::updatePrescribedDeflection( runTime.timeOutputValue() );
-        }
+//        if (!beamSolve)
+//        {
+//            BD::updatePrescribedDeflection( runTime.timeOutputValue() );
+//        }
 
         // Displacements are updated through the beamDynInterface boundary condition
         // Note: there should not be any displacement for the first time step
@@ -166,7 +168,7 @@ int main(int argc, char *argv[])
             BD::updateSectionLoads( mesh, p, turbulence );
             BD::update( runTime.timeOutputValue(), runTime.deltaT().value() );
             
-            BD::write( runTime.outputTime(), runTime.timeName() );
+            BD::write( runTime.timeName(), runTime.outputTime() ); // (time string, output flag)
         }
 
         Info<< nl
