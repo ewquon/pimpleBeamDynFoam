@@ -116,6 +116,7 @@ int main(int argc, char *argv[])
         // Note: there should not be any displacement for the first time step
         Info<< "Performing mesh update" << endl;
         mesh.update();
+        Info<< "  deformed mesh : " << min( mesh.V() ) << endl;
 
         if (fluidSolve)
         {
