@@ -116,7 +116,6 @@ int main(int argc, char *argv[])
         // Note: there should not be any displacement for the first time step
         Info<< "Performing mesh update" << endl;
         mesh.update();
-        Info<< "  deformed mesh : " << min( mesh.V() ) << endl;
 
         if (fluidSolve)
         {
@@ -157,7 +156,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        Info<< "Writing output" << endl;
+        //Info<< "Writing output" << endl;
         runTime.write();
 
         //
@@ -167,7 +166,7 @@ int main(int argc, char *argv[])
         if (beamSolve)
         {
             BD::updateSectionLoads( mesh, p, turbulence );
-            BD::update( runTime.timeOutputValue(), runTime.deltaT().value() );
+            BD::update( runTime.timeOutputValue(), runTime.deltaT().value(), mesh );
             
             BD::write( runTime.timeName(), runTime.outputTime() ); // (time string, output flag)
         }
