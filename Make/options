@@ -24,4 +24,4 @@ EXE_LIBS = \
     -ldynamicMesh \
     -lmeshTools \
     -lBeamDynInterface \
-    -lBeamDyn -llapack -lblas
+    -lBeamDyn
